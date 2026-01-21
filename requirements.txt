@@ -1,0 +1,4 @@
+flask>=2.0
+flask-cors
+openai>=1.0
+python-dotenv

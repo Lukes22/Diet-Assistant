@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>饮食助手 - AI 卡路里计算</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- 顶部栏 -->
+        <header class="header">
+            <h1>饮食助手</h1>
+        </header>
+
+        <!-- 餐次选择 -->
+        <div class="meal-selector">
+            <button class="meal-btn active" data-meal="早餐">
+                <span class="meal-icon">🌅</span>
+                <span>早餐</span>
+            </button>
+            <button class="meal-btn" data-meal="午餐">
+                <span class="meal-icon">☀️</span>
+                <span>午餐</span>
+            </button>
+            <button class="meal-btn" data-meal="晚餐">
+                <span class="meal-icon">🌙</span>
+                <span>晚餐</span>
+            </button>
+            <button class="meal-btn" data-meal="零食">
+                <span class="meal-icon">🍪</span>
+                <span>零食</span>
+            </button>
+        </div>
+
+        <!-- 对话区域 -->
+        <div class="chat-container" id="chatContainer">
+            <div class="welcome-message">
+                <div class="welcome-icon">🥗</div>
+                <h2>欢迎使用饮食助手</h2>
+                <p>选择餐次，输入您的饮食内容，我会帮您计算卡路里并给出健康建议。</p>
+                <p class="example">例如：两个包子，一杯豆浆，一个煎蛋</p>
+            </div>
+        </div>
+
+        <!-- 输入区域 -->
+        <div class="input-container">
+            <input type="text" id="messageInput" placeholder="输入您的饮食内容..." autocomplete="off">
+            <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
