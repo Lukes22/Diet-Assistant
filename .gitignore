@@ -1,0 +1,4 @@
+#ignore environment files
+.env
+#排除env.example
+!.env.example
