@@ -1,6 +1,6 @@
 搭建一个【饮食助手】网页，当用户输入一餐的饮食，通过AI计算出大致的卡路里，并给出形象的解释和建议
 必要功能：用户可以选择早餐，午餐，晚餐，零食。在对话框中输入一餐饮食，提取用户语言中的关键词。计算卡路里（对于模棱两可的语言，难以计算，可出现卡片弹窗让用户进行选择，例如米饭是大碗还是小碗？可乐是大杯还是小杯？）输出卡路里的计算结果并将卡路里的计算结果以x瓶可乐，x碗米饭，跑步x公里，的形式告知用户。根据“中国居民膳食指南”分析用户的饮食，给出饮食建议。
 
-使用魔搭的API-Inference，有几个需要适配的有几个地方： • base url: 指向魔搭API-Inference服务 https://api-inference.modelscope.cn/v1/。 • api_key: 使用魔搭的访问令牌(Access Token),可以在第一次使用时询问我。 • 模型名字(model):使用魔搭上开源模型的Model Id，Qwen/Qwen2.5-Coder-32B-Instruct
+使用魔搭的API-Inference，有几个需要适配的有几个地方： • base url: 指向魔搭API-Inference服务 https://api-inference.modelscope.cn/v1/。 • api_key: 使用魔搭的访问令牌(Access Token),可以在第一次使用时询问我。 • 模型名字(model):使用魔搭上开源模型的Model Id，Qwen/Qwen2.5-32B-Instruct
 
 希望使用python进行开发，实现一个web项目，界面清晰美观，模拟与饮食助手AI对话的形式。

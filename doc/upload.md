@@ -6,7 +6,7 @@
 
 下面是上传魔搭创空间的指南，修改完项目后，请你帮我上传代码。
 step1: 克隆项目空间 git lfs install
-git clone http://oauth2:ms-c4ec1832-cfd5-4e92-823b-50b0ca259681@www.modelscope.cn/studios/Lukes22/DIet_Assistant.git
+git clone 创空间链接
    step2: 创建 app.py 文件 import gradio as gr
 def modelscope_quickstart(name):
     return "Welcome to modelscope, " + name + "!!"
