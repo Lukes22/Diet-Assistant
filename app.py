@@ -17,7 +17,7 @@ CORS(app)
 
 # 魔搭 API 配置
 MODELSCOPE_BASE_URL = "https://api-inference.modelscope.cn/v1/"
-MODEL_NAME = "Qwen/Qwen2.5-Coder-32B-Instruct"
+MODEL_NAME = "Qwen/Qwen3-32B"
 API_KEY = os.getenv('MODELSCOPE_API_KEY', '')
 
 # 卡路里换算常量
