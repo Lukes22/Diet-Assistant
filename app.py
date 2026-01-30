@@ -17,7 +17,7 @@ CORS(app)
 
 # 魔搭 API 配置
 MODELSCOPE_BASE_URL = "https://api-inference.modelscope.cn/v1/"
-MODEL_NAME = "Qwen/Qwen3-32B"
+MODEL_NAME = "Qwen/Qwen2.5-32B-Instruct"
 API_KEY = os.getenv('MODELSCOPE_API_KEY', '')
 
 # 卡路里换算常量
@@ -111,6 +111,27 @@ def get_client():
     )
 
 
+def call_ai_streaming(client, messages):
+    """使用流式调用 AI，收集完整响应"""
+    response = client.chat.completions.create(
+        model=MODEL_NAME,
+        messages=messages,
+        temperature=0.3,
+        max_tokens=2000,
+        stream=True
+    )
+    
+    # 收集响应内容
+    answer_content = ""
+    for chunk in response:
+        if chunk.choices:
+            delta = chunk.choices[0].delta
+            if hasattr(delta, 'content') and delta.content:
+                answer_content += delta.content
+    
+    return answer_content
+
+
 def calculate_visualizations(total_calories):
     """计算形象化展示数据"""
     return {
@@ -183,17 +204,12 @@ def analyze_meal():
 
 请分析以上饮食内容，识别所有食物并计算卡路里。如果有描述不明确的食物，请标记为需要澄清。"""
         
-        response = client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_prompt}
-            ],
-            temperature=0.3,
-            max_tokens=2000
-        )
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_prompt}
+        ]
         
-        ai_response = response.choices[0].message.content
+        ai_response = call_ai_streaming(client, messages)
         result = parse_ai_response(ai_response)
         
         if not result:
@@ -240,17 +256,12 @@ def confirm_clarification():
 
 请计算总卡路里并给出饮食建议。直接返回 clear 状态的 JSON 结果。"""
         
-        response = client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_prompt}
-            ],
-            temperature=0.3,
-            max_tokens=2000
-        )
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_prompt}
+        ]
         
-        ai_response = response.choices[0].message.content
+        ai_response = call_ai_streaming(client, messages)
         result = parse_ai_response(ai_response)
         
         if not result:

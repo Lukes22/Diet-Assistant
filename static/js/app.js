@@ -191,17 +191,17 @@ function addResultCard(result) {
             <div class="visualizations">
                 <div class="viz-item">
                     <div class="viz-icon">🥤</div>
-                    <div class="viz-value">${viz.cola}</div>
+                    <div class="viz-value">≈${viz.cola}</div>
                     <div class="viz-label">瓶可乐</div>
                 </div>
                 <div class="viz-item">
                     <div class="viz-icon">🍚</div>
-                    <div class="viz-value">${viz.rice}</div>
+                    <div class="viz-value">≈${viz.rice}</div>
                     <div class="viz-label">碗米饭</div>
                 </div>
                 <div class="viz-item">
                     <div class="viz-icon">🏃</div>
-                    <div class="viz-value">${viz.running_km}</div>
+                    <div class="viz-value">≈${viz.running_km}</div>
                     <div class="viz-label">公里跑步</div>
                 </div>
             </div>
