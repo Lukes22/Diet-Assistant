@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>饮食助手 - AI 卡路里计算</title>
+    <title>食友记 - 记录美食，分享健康</title>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
     <div class="main-container">
         <!-- 顶部栏 -->
         <header class="header">
-            <h1>饮食助手</h1>
+            <h1>食友记</h1>
             <div class="header-actions">
                 <span class="user-name" id="userName"></span>
                 <a href="/settings" class="header-btn" title="设置">
@@ -39,12 +39,12 @@
 
         <!-- 主体内容 -->
         <div class="content-wrapper">
-            <!-- 左侧：饮食助手 -->
+            <!-- 左侧：食友记 -->
             <div class="left-panel">
                 <div class="chat-container" id="chatContainer">
                     <div class="welcome-message" id="welcomeMessage">
                         <div class="welcome-icon">🥗</div>
-                        <h2 id="greetingText">欢迎使用饮食助手</h2>
+                        <h2 id="greetingText">欢迎使用食友记</h2>
                         <p>选择餐次记录饮食，或直接向我咨询饮食建议。</p>
                         <p class="example">例如：两个包子，一杯豆浆 | 或问：减肥应该怎么吃？</p>
                     </div>
@@ -114,6 +114,42 @@
         </div>
     </div>
 
-    <script src="/static/js/app.js"></script>
+    <!-- 分享预览弹窗 -->
+    <div class="modal" id="shareModal">
+        <div class="modal-content share-modal-content">
+            <div class="modal-header">
+                <h2>分享到微信</h2>
+                <button class="close-btn" onclick="closeShareModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="share-preview" id="sharePreview">
+                    <div class="share-card" id="shareCard">
+                        <div class="share-header">
+                            <span class="share-logo">🥗</span>
+                            <span class="share-title">食友记</span>
+                        </div>
+                        <div class="share-content" id="shareContent"></div>
+                        <div class="share-footer">
+                            <span>— 来自食友记 AI —</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="share-actions">
+                    <button class="share-btn-primary" onclick="downloadShareImage()">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        保存图片
+                    </button>
+                </div>
+                <p class="share-tip">保存图片后，打开微信分享给好友或朋友圈</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="/static/js/app.js?v=2"></script>
 </body>
 </html>

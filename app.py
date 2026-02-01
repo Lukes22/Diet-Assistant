@@ -1,5 +1,5 @@
 """
-饮食助手 - Flask 后端应用（含社交功能）
+食友记 - Flask 后端应用（含社交功能）
 """
 import os
 from flask import Flask, request, jsonify, render_template, redirect, url_for
@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 import json
 import re
 
-from models import db, User, MealRecord, Friendship, Message, generate_invite_code
+from models import db, User, MealRecord, Friendship, Message, MealReaction, AIFeedback, generate_invite_code
 
 # 加载环境变量
 load_dotenv()
@@ -43,7 +43,7 @@ RICE_BOWL_CALORIES = 232
 RUNNING_KM_CALORIES = 60
 
 # 问候语系统提示词
-GREETING_PROMPT = """你是一个温暖友好的营养师助手"饮食助手"。请根据当前时间和用户信息，生成一句简短的问候语和鼓励话语。
+GREETING_PROMPT = """你是一个温暖友好的营养师助手"食友记"。请根据当前时间和用户信息，生成一句简短的问候语和鼓励话语。
 
 要求：
 1. 根据时间使用合适的问候（早上好/中午好/下午好/晚上好）
@@ -54,7 +54,7 @@ GREETING_PROMPT = """你是一个温暖友好的营养师助手"饮食助手"。
 直接输出问候语，不要加任何前缀或解释。"""
 
 # 饮食咨询系统提示词
-CHAT_PROMPT = """你是一个专业的营养师助手，名叫"饮食助手"。你可以：
+CHAT_PROMPT = """你是一个专业的营养师助手，名叫"食友记"。你可以：
 1. 回答用户关于饮食、营养、健康的问题
 2. 根据用户的健康目标（减重/增肌/保持规律饮食）提供个性化建议
 3. 制定简单的饮食计划建议
@@ -243,6 +243,15 @@ def friends_page():
     return render_template('friends.html')
 
 
+@app.route('/admin')
+@login_required
+def admin_page():
+    """管理员后台页面"""
+    if current_user.username.lower() != 'admin':
+        return redirect(url_for('index'))
+    return render_template('admin.html')
+
+
 # ========== 用户认证 API ==========
 
 @app.route('/api/register', methods=['POST'])
@@ -287,7 +296,9 @@ def register():
     db.session.commit()
     
     login_user(user)
-    return jsonify({'success': True, 'user': user.to_dict()})
+    # 判断是否为管理员
+    is_admin = username.lower() == 'admin'
+    return jsonify({'success': True, 'user': user.to_dict(), 'is_admin': is_admin})
 
 
 @app.route('/api/login', methods=['POST'])
@@ -302,7 +313,9 @@ def login():
         return jsonify({'error': '用户名或密码错误'}), 401
     
     login_user(user)
-    return jsonify({'success': True, 'user': user.to_dict()})
+    # 判断是否为管理员
+    is_admin = username.lower() == 'admin'
+    return jsonify({'success': True, 'user': user.to_dict(), 'is_admin': is_admin})
 
 
 @app.route('/api/logout', methods=['POST'])
@@ -348,7 +361,16 @@ def get_meals():
         MealRecord.user_id == current_user.id,
         MealRecord.created_at >= week_ago
     ).order_by(MealRecord.created_at.desc()).all()
-    return jsonify([r.to_dict() for r in records])
+    
+    # 为每条记录添加点赞/点踩统计
+    result = []
+    for r in records:
+        data = r.to_dict()
+        data['likes'] = MealReaction.query.filter_by(meal_id=r.id, reaction_type='like').count()
+        data['dislikes'] = MealReaction.query.filter_by(meal_id=r.id, reaction_type='dislike').count()
+        result.append(data)
+    
+    return jsonify(result)
 
 
 @app.route('/api/meals', methods=['POST'])
@@ -486,6 +508,7 @@ def send_message():
     data = request.json
     to_user_id = data.get('receiver_id') or data.get('to_user_id')
     content = data.get('content', '').strip()
+    meal_id = data.get('meal_id')  # 可选：关联的饮食记录
     
     if not content:
         return jsonify({'error': '留言内容不能为空'}), 400
@@ -498,9 +521,16 @@ def send_message():
     if not friendship:
         return jsonify({'error': '只能给好友留言'}), 403
     
+    # 如果有 meal_id，验证该饮食记录属于目标好友
+    if meal_id:
+        meal = MealRecord.query.get(meal_id)
+        if not meal or meal.user_id != to_user_id:
+            return jsonify({'error': '无效的饮食记录'}), 400
+    
     message = Message(
         from_user_id=current_user.id,
         to_user_id=to_user_id,
+        meal_id=meal_id,
         content=content
     )
     
@@ -725,6 +755,193 @@ def confirm_clarification():
         
     except Exception as e:
         return jsonify({'error': f'计算失败: {str(e)}'}), 500
+
+
+# ========== 饮食点赞/点踩 API ==========
+
+@app.route('/api/meals/<int:meal_id>/reaction', methods=['POST'])
+@login_required
+def react_to_meal(meal_id):
+    """给好友的饮食点赞/点踩"""
+    data = request.json
+    reaction_type = data.get('type')  # like/dislike
+    
+    if reaction_type not in ['like', 'dislike']:
+        return jsonify({'error': '无效的反应类型'}), 400
+    
+    # 检查饮食记录是否存在
+    meal = MealRecord.query.get(meal_id)
+    if not meal:
+        return jsonify({'error': '记录不存在'}), 404
+    
+    # 不能给自己的饮食点赞
+    if meal.user_id == current_user.id:
+        return jsonify({'error': '不能给自己的饮食点赞'}), 400
+    
+    # 检查是否为好友关系
+    friendship = Friendship.query.filter_by(user_id=current_user.id, friend_id=meal.user_id).first()
+    if not friendship:
+        return jsonify({'error': '只能给好友的饮食点赞'}), 403
+    
+    # 查找现有的反应
+    existing = MealReaction.query.filter_by(user_id=current_user.id, meal_id=meal_id).first()
+    
+    if existing:
+        if existing.reaction_type == reaction_type:
+            # 取消反应
+            db.session.delete(existing)
+            db.session.commit()
+            return jsonify({'success': True, 'action': 'removed', 'type': reaction_type})
+        else:
+            # 切换反应类型
+            existing.reaction_type = reaction_type
+            db.session.commit()
+            return jsonify({'success': True, 'action': 'switched', 'type': reaction_type})
+    else:
+        # 新增反应
+        reaction = MealReaction(
+            user_id=current_user.id,
+            meal_id=meal_id,
+            reaction_type=reaction_type
+        )
+        db.session.add(reaction)
+        db.session.commit()
+        return jsonify({'success': True, 'action': 'added', 'type': reaction_type})
+
+
+@app.route('/api/meals/<int:meal_id>/reactions', methods=['GET'])
+@login_required
+def get_meal_reactions(meal_id):
+    """获取饮食记录的点赞/点踩统计"""
+    meal = MealRecord.query.get(meal_id)
+    if not meal:
+        return jsonify({'error': '记录不存在'}), 404
+    
+    likes = MealReaction.query.filter_by(meal_id=meal_id, reaction_type='like').count()
+    dislikes = MealReaction.query.filter_by(meal_id=meal_id, reaction_type='dislike').count()
+    
+    # 获取当前用户的反应
+    my_reaction = MealReaction.query.filter_by(user_id=current_user.id, meal_id=meal_id).first()
+    
+    return jsonify({
+        'likes': likes,
+        'dislikes': dislikes,
+        'my_reaction': my_reaction.reaction_type if my_reaction else None
+    })
+
+
+# ========== AI 反馈 API ==========
+
+@app.route('/api/ai-feedback', methods=['POST'])
+@login_required
+def submit_ai_feedback():
+    """提交 AI 回答反馈"""
+    data = request.json
+    query = data.get('query', '')
+    response = data.get('response', '')
+    feedback_type = data.get('type')  # like/dislike
+    reason = data.get('reason', '')  # 点踩原因（可选）
+    mode = data.get('mode', 'chat')  # food/chat
+    
+    if feedback_type not in ['like', 'dislike']:
+        return jsonify({'error': '无效的反馈类型'}), 400
+    
+    if not query or not response:
+        return jsonify({'error': '缺少必要参数'}), 400
+    
+    feedback = AIFeedback(
+        user_id=current_user.id,
+        query=query,
+        response=response,
+        feedback_type=feedback_type,
+        reason=reason if reason else None,
+        mode=mode
+    )
+    
+    db.session.add(feedback)
+    db.session.commit()
+    
+    return jsonify({'success': True})
+
+
+# ========== 管理员 API ==========
+
+@app.route('/api/admin/stats', methods=['GET'])
+@login_required
+def admin_stats():
+    """获取管理员统计数据"""
+    if current_user.username.lower() != 'admin':
+        return jsonify({'error': '无权限'}), 403
+    
+    # 用户统计
+    total_users = User.query.count()
+    today = datetime.utcnow().date()
+    today_start = datetime.combine(today, datetime.min.time())
+    new_users_today = User.query.filter(User.created_at >= today_start).count()
+    
+    # 饮食记录统计
+    total_meals = MealRecord.query.count()
+    meals_today = MealRecord.query.filter(MealRecord.created_at >= today_start).count()
+    
+    # AI反馈统计
+    total_feedbacks = AIFeedback.query.count()
+    likes = AIFeedback.query.filter_by(feedback_type='like').count()
+    dislikes = AIFeedback.query.filter_by(feedback_type='dislike').count()
+    
+    # 留言统计
+    total_messages = Message.query.count()
+    
+    return jsonify({
+        'users': {
+            'total': total_users,
+            'today': new_users_today
+        },
+        'meals': {
+            'total': total_meals,
+            'today': meals_today
+        },
+        'ai_feedbacks': {
+            'total': total_feedbacks,
+            'likes': likes,
+            'dislikes': dislikes
+        },
+        'messages': {
+            'total': total_messages
+        }
+    })
+
+
+@app.route('/api/admin/users', methods=['GET'])
+@login_required
+def admin_users():
+    """获取用户列表"""
+    if current_user.username.lower() != 'admin':
+        return jsonify({'error': '无权限'}), 403
+    
+    users = User.query.order_by(User.created_at.desc()).limit(100).all()
+    result = []
+    for user in users:
+        meal_count = MealRecord.query.filter_by(user_id=user.id).count()
+        result.append({
+            'id': user.id,
+            'username': user.username,
+            'goal': user.goal,
+            'meal_count': meal_count,
+            'created_at': user.created_at.strftime('%Y-%m-%d %H:%M')
+        })
+    
+    return jsonify(result)
+
+
+@app.route('/api/admin/feedbacks', methods=['GET'])
+@login_required
+def admin_feedbacks():
+    """获取 AI 反馈列表"""
+    if current_user.username.lower() != 'admin':
+        return jsonify({'error': '无权限'}), 403
+    
+    feedbacks = AIFeedback.query.order_by(AIFeedback.created_at.desc()).limit(100).all()
+    return jsonify([f.to_dict() for f in feedbacks])
 
 
 # ========== 初始化数据库 ==========

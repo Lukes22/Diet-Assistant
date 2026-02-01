@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>饮食助手 - 登录</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>食友记 - 登录</title>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body class="auth-body">
@@ -11,8 +12,8 @@
         <div class="auth-card">
             <div class="auth-header">
                 <div class="auth-logo">🥗</div>
-                <h1>饮食助手</h1>
-                <p>AI 智能卡路里计算</p>
+                <h1>食友记</h1>
+                <p>记录美食，分享健康</p>
             </div>
 
             <!-- 登录表单 -->
@@ -106,9 +107,16 @@
                     body: JSON.stringify({ username, password })
                 });
                 const result = await response.json();
+                console.log('Login result:', result);
 
                 if (result.success) {
-                    window.location.href = '/';
+                    // 管理员跳转后台，普通用户跳转主页
+                    console.log('is_admin:', result.is_admin);
+                    if (result.is_admin) {
+                        window.location.href = '/admin';
+                    } else {
+                        window.location.href = '/';
+                    }
                 } else {
                     errorEl.textContent = result.error || '登录失败';
                 }
@@ -140,7 +148,12 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    window.location.href = '/';
+                    // 管理员跳转后台，普通用户跳转主页
+                    if (result.is_admin) {
+                        window.location.href = '/admin';
+                    } else {
+                        window.location.href = '/';
+                    }
                 } else {
                     errorEl.textContent = result.error || '注册失败';
                 }

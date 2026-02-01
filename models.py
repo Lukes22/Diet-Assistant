@@ -100,15 +100,80 @@ class Message(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     from_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     to_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    meal_id = db.Column(db.Integer, db.ForeignKey('meal_records.id'), nullable=True)  # 关联的饮食记录（可选）
     content = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
+    # 关联饮食记录
+    meal = db.relationship('MealRecord', backref='comments')
+    
     def to_dict(self):
-        return {
+        result = {
             'id': self.id,
             'sender_id': self.from_user_id,
             'sender_name': self.sender.username,
             'receiver_id': self.to_user_id,
             'content': self.content,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M')
+        }
+        # 如果有关联的饮食记录，添加饮食信息
+        if self.meal_id and self.meal:
+            import json
+            foods = json.loads(self.meal.foods) if self.meal.foods else []
+            food_names = '、'.join([f['name'] for f in foods]) if foods else '无详情'
+            result['meal_info'] = {
+                'id': self.meal.id,
+                'meal_type': self.meal.meal_type,
+                'foods': food_names,
+                'calories': self.meal.total_calories
+            }
+        return result
+
+
+class MealReaction(db.Model):
+    """饮食记录点赞/点踩表"""
+    __tablename__ = 'meal_reactions'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    meal_id = db.Column(db.Integer, db.ForeignKey('meal_records.id'), nullable=False)
+    reaction_type = db.Column(db.String(10), nullable=False)  # like/dislike
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # 唯一约束：一个用户对一条饮食记录只能有一个反应
+    __table_args__ = (db.UniqueConstraint('user_id', 'meal_id', name='unique_user_meal_reaction'),)
+    
+    # 关系
+    user = db.relationship('User', backref='reactions')
+    meal = db.relationship('MealRecord', backref='reactions')
+
+
+class AIFeedback(db.Model):
+    """AI回答反馈表"""
+    __tablename__ = 'ai_feedbacks'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    user_query = db.Column(db.Text, nullable=False)  # 用户的问题
+    response = db.Column(db.Text, nullable=False)  # AI的回答
+    feedback_type = db.Column(db.String(10), nullable=False)  # like/dislike
+    reason = db.Column(db.Text, nullable=True)  # 点踩原因（可选）
+    mode = db.Column(db.String(10), nullable=False)  # food/chat
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # 关系
+    user = db.relationship('User', backref='ai_feedbacks')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'username': self.user.username,
+            'query': self.user_query,
+            'response': self.response[:100] + '...' if len(self.response) > 100 else self.response,
+            'full_response': self.response,
+            'feedback_type': self.feedback_type,
+            'reason': self.reason,
+            'mode': self.mode,
             'created_at': self.created_at.strftime('%Y-%m-%d %H:%M')
         }

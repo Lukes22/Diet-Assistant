@@ -1,5 +1,5 @@
 /**
- * 饮食助手 - 前端应用逻辑（含社交功能）
+ * 食友记 - 前端应用逻辑（含社交功能）
  */
 
 // 状态管理
@@ -196,6 +196,15 @@ function renderMealRecords(records) {
         }
         const foodsText = foods.map(f => f.name).join('、') || '无详情';
         
+        // 点赞/点踩显示
+        const hasReactions = record.likes > 0 || record.dislikes > 0;
+        const reactionsHtml = hasReactions ? `
+            <div class="record-reactions">
+                ${record.likes > 0 ? `<span class="reaction-stat like-stat">👍 ${record.likes}</span>` : ''}
+                ${record.dislikes > 0 ? `<span class="reaction-stat dislike-stat">👎 ${record.dislikes}</span>` : ''}
+            </div>
+        ` : '';
+        
         return `
             <div class="record-item" data-id="${record.id}">
                 <div class="record-header">
@@ -205,6 +214,7 @@ function renderMealRecords(records) {
                     <span class="record-calories">${record.total_calories} 卡</span>
                 </div>
                 <div class="record-foods">${escapeHtml(foodsText)}</div>
+                ${reactionsHtml}
                 <button class="record-delete" onclick="deleteMealRecord(${record.id})">删除</button>
             </div>
         `;
@@ -288,12 +298,24 @@ function renderMessages(messages) {
         const isFromMe = state.currentUser && msg.sender_id === state.currentUser.id;
         const friendId = isFromMe ? msg.receiver_id : msg.sender_id;
         
+        // 关联饮食记录信息
+        let mealRefHtml = '';
+        if (msg.meal_info) {
+            mealRefHtml = `
+                <div class="message-meal-ref">
+                    <span class="meal-ref-icon">🍽️</span>
+                    <span class="meal-ref-text">${msg.meal_info.meal_type}: ${escapeHtml(msg.meal_info.foods)} (${msg.meal_info.calories}卡)</span>
+                </div>
+            `;
+        }
+        
         return `
             <div class="message-item clickable" onclick="goToFriend(${friendId})">
                 <div class="message-header">
                     <span class="message-sender">${isFromMe ? '我' : msg.sender_name}</span>
                     <span class="message-time">${date}</span>
                 </div>
+                ${mealRefHtml}
                 <div class="message-text">${escapeHtml(msg.content)}</div>
             </div>
         `;
@@ -598,7 +620,7 @@ async function sendFriendMessage() {
 // ==================== 用户认证 ====================
 
 // 退出登录
-async function logout() {
+async function handleLogout() {
     if (!confirm('确定要退出登录吗？')) return;
     
     try {
@@ -657,7 +679,7 @@ async function sendChatMessage(message) {
         if (result.error) {
             addErrorMessage(result.error);
         } else {
-            addChatReply(result.reply);
+            addChatReply(result.reply, message);
         }
     } catch (error) {
         loadingEl.remove();
@@ -749,12 +771,33 @@ function addUserChatMessage(text) {
 }
 
 // 添加 AI 咨询回复
-function addChatReply(reply) {
+function addChatReply(reply, query) {
     const messageEl = document.createElement('div');
     messageEl.className = 'message assistant';
+    const formattedReply = formatReply(reply);
     messageEl.innerHTML = `
-        <div class="chat-reply">${formatReply(reply)}</div>
+        <div class="chat-reply">${formattedReply}</div>
+        <div class="reply-actions">
+            <button class="feedback-btn like-feedback" onclick="submitAIFeedback(this, 'like', 'chat')">
+                <span>👍</span>
+            </button>
+            <button class="feedback-btn dislike-feedback" onclick="submitAIFeedback(this, 'dislike', 'chat')">
+                <span>👎</span>
+            </button>
+            <button class="share-btn" onclick="openShareModal(this, 'chat')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="18" cy="5" r="3"></circle>
+                    <circle cx="6" cy="12" r="3"></circle>
+                    <circle cx="18" cy="19" r="3"></circle>
+                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+                </svg>
+                分享
+            </button>
+        </div>
     `;
+    messageEl.dataset.originalContent = reply;
+    messageEl.dataset.query = query || '';
     chatContainer.appendChild(messageEl);
     scrollToBottom();
 }
@@ -840,6 +883,10 @@ function addResultCard(result) {
     // 形象化数据
     const viz = result.visualizations || { cola: 0, rice: 0, running_km: 0 };
     
+    // 生成分享文案
+    const foodNames = result.foods.map(f => f.name).join('、');
+    const shareText = `今日饮食：${foodNames}\n总计：${result.total_calories} 卡路里\n健康评分：${score}分\n${result.dietary_advice || ''}`;
+    
     messageEl.innerHTML = `
         <div class="result-card">
             <div class="result-header">
@@ -874,7 +921,26 @@ function addResultCard(result) {
                 <p>${escapeHtml(result.dietary_advice || '请保持均衡饮食，适量摄入各类营养素。')}</p>
             </div>
         </div>
+        <div class="reply-actions">
+            <button class="feedback-btn like-feedback" onclick="submitAIFeedback(this, 'like', 'food')">
+                <span>👍</span>
+            </button>
+            <button class="feedback-btn dislike-feedback" onclick="submitAIFeedback(this, 'dislike', 'food')">
+                <span>👎</span>
+            </button>
+            <button class="share-btn" onclick="openShareModal(this, 'result')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="18" cy="5" r="3"></circle>
+                    <circle cx="6" cy="12" r="3"></circle>
+                    <circle cx="18" cy="19" r="3"></circle>
+                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+                </svg>
+                分享
+            </button>
+        </div>
     `;
+    messageEl.dataset.originalContent = shareText;
     chatContainer.appendChild(messageEl);
     scrollToBottom();
 }
@@ -1014,3 +1080,177 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
+
+// ==================== AI 反馈功能 ====================
+
+// 提交 AI 回答反馈
+async function submitAIFeedback(btn, type, mode) {
+    const messageEl = btn.closest('.message');
+    if (!messageEl) return;
+    
+    const actionsEl = btn.closest('.reply-actions');
+    
+    // 如果已经提交过反馈，不能再更改
+    if (actionsEl.dataset.submitted === 'true') {
+        return;
+    }
+    
+    const response = messageEl.dataset.originalContent || '';
+    const query = messageEl.dataset.query || '';
+    
+    let reason = '';
+    
+    // 点踩时询问原因
+    if (type === 'dislike') {
+        reason = prompt('请输入不满意的原因（可选）：') || '';
+    }
+    
+    try {
+        const res = await fetch('/api/ai-feedback', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query, response, type, mode, reason })
+        });
+        
+        if (res.ok) {
+            // 标记已提交，不可更改
+            actionsEl.dataset.submitted = 'true';
+            
+            // 更新按钮状态
+            actionsEl.querySelectorAll('.feedback-btn').forEach(b => {
+                b.classList.remove('active');
+                b.disabled = true;
+                b.style.opacity = '0.5';
+                b.style.cursor = 'not-allowed';
+            });
+            btn.classList.add('active');
+            btn.style.opacity = '1';
+        }
+    } catch (error) {
+        console.error('提交反馈失败:', error);
+    }
+}
+
+// ==================== 分享功能 ====================
+
+let currentShareContent = '';
+
+// 打开分享弹窗
+function openShareModal(btn, type) {
+    console.log('openShareModal called', btn, type);
+    const messageEl = btn.closest('.message');
+    if (!messageEl) {
+        console.error('Cannot find parent .message element');
+        return;
+    }
+    const content = messageEl.dataset.originalContent || '';
+    console.log('Share content:', content);
+    
+    currentShareContent = content;
+    
+    // 设置分享卡片内容
+    const shareContentEl = document.getElementById('shareContent');
+    if (shareContentEl) {
+        shareContentEl.innerHTML = formatReply(content);
+    }
+    
+    // 显示弹窗
+    const modal = document.getElementById('shareModal');
+    if (modal) {
+        modal.classList.add('active');
+        console.log('Modal activated');
+    } else {
+        console.error('shareModal not found');
+    }
+}
+
+// 关闭分享弹窗
+function closeShareModal() {
+    document.getElementById('shareModal').classList.remove('active');
+}
+
+// 下载分享图片
+async function downloadShareImage() {
+    const shareCard = document.getElementById('shareCard');
+    
+    try {
+        // 使用 html2canvas 生成图片
+        const canvas = await html2canvas(shareCard, {
+            scale: 2,
+            backgroundColor: null,
+            useCORS: true
+        });
+        
+        // 创建下载链接
+        const link = document.createElement('a');
+        link.download = '食友记分享_' + new Date().getTime() + '.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        
+        // 提示用户
+        setTimeout(() => {
+            alert('图片已保存！打开微信，发送给好友或分享到朋友圈');
+        }, 500);
+        
+    } catch (error) {
+        console.error('生成图片失败:', error);
+        // 降级方案：复制文字
+        copyToClipboard(currentShareContent);
+        alert('图片生成失败，已复制文字内容，请打开微信粘贴分享');
+    }
+}
+
+// 复制到剪贴板
+function copyToClipboard(text) {
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(text);
+    } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+    }
+}
+
+// 点击弹窗背景关闭
+document.addEventListener('DOMContentLoaded', () => {
+    const shareModal = document.getElementById('shareModal');
+    if (shareModal) {
+        shareModal.addEventListener('click', (e) => {
+            if (e.target.id === 'shareModal') {
+                closeShareModal();
+            }
+        });
+    }
+    
+    // 使用事件委托处理分享按钮点击
+    if (chatContainer) {
+        chatContainer.addEventListener('click', (e) => {
+            const shareBtn = e.target.closest('.share-btn');
+            if (shareBtn) {
+                const messageEl = shareBtn.closest('.message');
+                if (messageEl) {
+                    const content = messageEl.dataset.originalContent || '';
+                    currentShareContent = content;
+                    
+                    const shareContentEl = document.getElementById('shareContent');
+                    if (shareContentEl) {
+                        shareContentEl.innerHTML = formatReply(content);
+                    }
+                    
+                    const modal = document.getElementById('shareModal');
+                    if (modal) {
+                        modal.classList.add('active');
+                    }
+                }
+            }
+        });
+    }
+});
+
+// 暴露函数到全局作用域
+window.openShareModal = openShareModal;
+window.closeShareModal = closeShareModal;
+window.downloadShareImage = downloadShareImage;

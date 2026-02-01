@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>好友 - 饮食助手</title>
+    <title>好友 - 食友记</title>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body class="page-body">
@@ -60,6 +60,11 @@
                 
                 <div class="leave-message-section">
                     <h4>给TA留言</h4>
+                    <div id="commentingMealInfo" class="commenting-meal-info" style="display: none;">
+                        <span class="commenting-label">评论饮食:</span>
+                        <span id="commentingMealText"></span>
+                        <button class="cancel-comment-btn" onclick="cancelMealComment()">取消</button>
+                    </div>
                     <div class="message-input-group">
                         <input type="text" id="messageContent" placeholder="输入留言内容（最多200字）" maxlength="200">
                         <button onclick="sendMessage()">发送</button>
@@ -79,6 +84,7 @@
     <script>
         let currentFriendId = null;
         let currentUserId = null;
+        let commentingMealId = null;  // 当前正在评论的饮食记录ID
 
         // 加载当前用户信息
         async function loadCurrentUser() {
@@ -245,7 +251,7 @@
                 const foodsText = foods.map(f => f.name).join('、') || '无详情';
                 
                 return `
-                    <div class="meal-record-item">
+                    <div class="meal-record-item" data-meal-id="${meal.id}">
                         <div class="meal-header">
                             <span class="meal-icon">${icon}</span>
                             <span class="meal-type">${meal.meal_type}</span>
@@ -253,9 +259,104 @@
                             <span class="meal-calories">${meal.total_calories} 卡</span>
                         </div>
                         <div class="meal-foods">${escapeHtml(foodsText)}</div>
+                        <div class="meal-reactions">
+                            <button class="reaction-btn like-btn" onclick="reactToMeal(${meal.id}, 'like', this)">
+                                <span class="reaction-icon">👍</span>
+                                <span class="reaction-count" id="likes-${meal.id}">0</span>
+                            </button>
+                            <button class="reaction-btn dislike-btn" onclick="reactToMeal(${meal.id}, 'dislike', this)">
+                                <span class="reaction-icon">👎</span>
+                                <span class="reaction-count" id="dislikes-${meal.id}">0</span>
+                            </button>
+                            <button class="reaction-btn comment-btn" onclick="startMealComment(${meal.id}, '${meal.meal_type}', '${escapeHtml(foodsText).replace(/'/g, "\\'")}')">
+                                <span class="reaction-icon">💬</span>
+                                <span>评论</span>
+                            </button>
+                        </div>
                     </div>
                 `;
             }).join('');
+            
+            // 加载每个饮食的点赞数
+            meals.forEach(meal => loadMealReactions(meal.id));
+        }
+
+        // 加载饮食点赞数
+        async function loadMealReactions(mealId) {
+            try {
+                const response = await fetch(`/api/meals/${mealId}/reactions`);
+                if (response.ok) {
+                    const data = await response.json();
+                    updateReactionUI(mealId, data);
+                }
+            } catch (error) {
+                console.error('加载点赞数失败:', error);
+            }
+        }
+
+        // 更新点赞UI
+        function updateReactionUI(mealId, data) {
+            const likesEl = document.getElementById(`likes-${mealId}`);
+            const dislikesEl = document.getElementById(`dislikes-${mealId}`);
+            
+            if (likesEl) likesEl.textContent = data.likes || 0;
+            if (dislikesEl) dislikesEl.textContent = data.dislikes || 0;
+            
+            // 更新按钮状态
+            const mealItem = document.querySelector(`[data-meal-id="${mealId}"]`);
+            if (mealItem) {
+                const likeBtn = mealItem.querySelector('.like-btn');
+                const dislikeBtn = mealItem.querySelector('.dislike-btn');
+                
+                likeBtn.classList.remove('active');
+                dislikeBtn.classList.remove('active');
+                
+                if (data.my_reaction === 'like') {
+                    likeBtn.classList.add('active');
+                } else if (data.my_reaction === 'dislike') {
+                    dislikeBtn.classList.add('active');
+                }
+            }
+        }
+
+        // 点赞/点踩
+        async function reactToMeal(mealId, type, btn) {
+            try {
+                const response = await fetch(`/api/meals/${mealId}/reaction`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type: type })
+                });
+                
+                if (response.ok) {
+                    // 重新加载点赞数
+                    await loadMealReactions(mealId);
+                } else {
+                    const result = await response.json();
+                    alert(result.error || '操作失败');
+                }
+            } catch (error) {
+                console.error('点赞失败:', error);
+                alert('网络错误，请重试');
+            }
+        }
+
+        // 开始评论饮食记录
+        function startMealComment(mealId, mealType, foodsText) {
+            commentingMealId = mealId;
+            const infoEl = document.getElementById('commentingMealInfo');
+            const textEl = document.getElementById('commentingMealText');
+            textEl.textContent = `${mealType}: ${foodsText}`;
+            infoEl.style.display = 'flex';
+            document.getElementById('messageContent').focus();
+            document.getElementById('messageContent').placeholder = '输入对这顿饮食的评论...';
+        }
+
+        // 取消评论饮食记录
+        function cancelMealComment() {
+            commentingMealId = null;
+            document.getElementById('commentingMealInfo').style.display = 'none';
+            document.getElementById('messageContent').placeholder = '输入留言内容（最多200字）';
         }
 
         // 加载聊天记录
@@ -289,9 +390,21 @@
                     minute: 'numeric'
                 });
                 
+                // 关联饮食记录信息
+                let mealInfoHtml = '';
+                if (msg.meal_info) {
+                    mealInfoHtml = `
+                        <div class="chat-meal-ref">
+                            <span class="meal-ref-label">评论饮食:</span>
+                            <span class="meal-ref-content">${msg.meal_info.meal_type}: ${escapeHtml(msg.meal_info.foods)} (${msg.meal_info.calories}卡)</span>
+                        </div>
+                    `;
+                }
+                
                 return `
                     <div class="chat-message ${isFromMe ? 'sent' : 'received'}">
                         <div class="chat-sender">${isFromMe ? '我' : msg.sender_name}</div>
+                        ${mealInfoHtml}
                         <div class="chat-bubble">${escapeHtml(msg.content)}</div>
                         <div class="chat-time">${time}</div>
                     </div>
@@ -314,17 +427,25 @@
             }
             
             try {
+                const requestData = {
+                    receiver_id: currentFriendId,
+                    content: content
+                };
+                
+                // 如果有关联的饮食记录
+                if (commentingMealId) {
+                    requestData.meal_id = commentingMealId;
+                }
+                
                 const response = await fetch('/api/messages', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        receiver_id: currentFriendId,
-                        content: content
-                    })
+                    body: JSON.stringify(requestData)
                 });
                 
                 if (response.ok) {
                     input.value = '';
+                    cancelMealComment();  // 清除评论状态
                     await loadChatHistory(currentFriendId);
                 } else {
                     alert('发送失败，请重试');
