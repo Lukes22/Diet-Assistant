@@ -4,6 +4,8 @@ WORKDIR /home/user/app
 
 COPY ./ /home/user/app
 
-RUN pip install flask flask-cors openai python-dotenv -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com
+RUN pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com
+
+EXPOSE 7860
 
 ENTRYPOINT ["python", "-u", "app.py"]
