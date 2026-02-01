@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>饮食助手 - 登录</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="auth-body">
+    <div class="auth-container">
+        <div class="auth-card">
+            <div class="auth-header">
+                <div class="auth-logo">🥗</div>
+                <h1>饮食助手</h1>
+                <p>AI 智能卡路里计算</p>
+            </div>
+
+            <!-- 登录表单 -->
+            <div id="loginForm" class="auth-form">
+                <h2>登录</h2>
+                <div class="form-group">
+                    <label>用户名</label>
+                    <input type="text" id="loginUsername" placeholder="请输入用户名">
+                </div>
+                <div class="form-group">
+                    <label>密码</label>
+                    <input type="password" id="loginPassword" placeholder="请输入密码">
+                </div>
+                <div class="form-error" id="loginError"></div>
+                <button class="auth-btn" onclick="handleLogin()">登录</button>
+                <p class="auth-switch">还没有账号？<a href="#" onclick="showRegister()">立即注册</a></p>
+            </div>
+
+            <!-- 注册表单 -->
+            <div id="registerForm" class="auth-form" style="display: none;">
+                <h2>注册</h2>
+                <div class="form-group">
+                    <label>用户名</label>
+                    <input type="text" id="regUsername" placeholder="2-20个字符">
+                </div>
+                <div class="form-group">
+                    <label>密码</label>
+                    <input type="password" id="regPassword" placeholder="至少6位">
+                </div>
+                <div class="form-group">
+                    <label>性别</label>
+                    <div class="radio-group">
+                        <label class="radio-label">
+                            <input type="radio" name="gender" value="male" checked> 男
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="gender" value="female"> 女
+                        </label>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group half">
+                        <label>身高 (cm)</label>
+                        <input type="number" id="regHeight" placeholder="170">
+                    </div>
+                    <div class="form-group half">
+                        <label>体重 (kg)</label>
+                        <input type="number" id="regWeight" placeholder="65">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>目标</label>
+                    <select id="regGoal">
+                        <option value="lose_weight">减重</option>
+                        <option value="gain_muscle">增肌</option>
+                        <option value="maintain">保持规律饮食</option>
+                    </select>
+                </div>
+                <div class="form-error" id="registerError"></div>
+                <button class="auth-btn" onclick="handleRegister()">注册</button>
+                <p class="auth-switch">已有账号？<a href="#" onclick="showLogin()">立即登录</a></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showLogin() {
+            document.getElementById('loginForm').style.display = 'block';
+            document.getElementById('registerForm').style.display = 'none';
+        }
+
+        function showRegister() {
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('registerForm').style.display = 'block';
+        }
+
+        async function handleLogin() {
+            const username = document.getElementById('loginUsername').value.trim();
+            const password = document.getElementById('loginPassword').value;
+            const errorEl = document.getElementById('loginError');
+
+            if (!username || !password) {
+                errorEl.textContent = '请输入用户名和密码';
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    window.location.href = '/';
+                } else {
+                    errorEl.textContent = result.error || '登录失败';
+                }
+            } catch (error) {
+                errorEl.textContent = '网络错误，请重试';
+            }
+        }
+
+        async function handleRegister() {
+            const username = document.getElementById('regUsername').value.trim();
+            const password = document.getElementById('regPassword').value;
+            const gender = document.querySelector('input[name="gender"]:checked').value;
+            const height = document.getElementById('regHeight').value;
+            const weight = document.getElementById('regWeight').value;
+            const goal = document.getElementById('regGoal').value;
+            const errorEl = document.getElementById('registerError');
+
+            if (!username || !password) {
+                errorEl.textContent = '请输入用户名和密码';
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password, gender, height, weight, goal })
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    window.location.href = '/';
+                } else {
+                    errorEl.textContent = result.error || '注册失败';
+                }
+            } catch (error) {
+                errorEl.textContent = '网络错误，请重试';
+            }
+        }
+
+        // 回车键提交
+        document.getElementById('loginPassword').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleLogin();
+        });
+        document.getElementById('regGoal').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleRegister();
+        });
+    </script>
+</body>
+</html>

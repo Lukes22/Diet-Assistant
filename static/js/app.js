@@ -1,12 +1,16 @@
 /**
- * 饮食助手 - 前端应用逻辑
+ * 饮食助手 - 前端应用逻辑（含社交功能）
  */
 
 // 状态管理
 const state = {
     currentMeal: '早餐',
+    currentMode: 'food', // 'food' 或 'chat'
     isLoading: false,
-    pendingClarification: null
+    pendingClarification: null,
+    currentUser: null,
+    friends: [],
+    selectedFriend: null
 };
 
 // DOM 元素
@@ -16,10 +20,77 @@ const sendBtn = document.getElementById('sendBtn');
 
 // 初始化
 document.addEventListener('DOMContentLoaded', () => {
+    initUser();
     initMealSelector();
     initInputHandler();
+    initModals();
     checkApiStatus();
 });
+
+// 初始化用户信息
+async function initUser() {
+    try {
+        const response = await fetch('/api/profile');
+        if (response.ok) {
+            const user = await response.json();
+            state.currentUser = user;
+            
+            // 显示用户名
+            const usernameEl = document.getElementById('userName');
+            if (usernameEl) {
+                usernameEl.textContent = user.username;
+            }
+            
+            // 加载饮食记录和消息
+            loadMealRecords();
+            loadMessages();
+            
+            // 获取 AI 问候语
+            fetchGreeting();
+        }
+    } catch (error) {
+        console.error('获取用户信息失败:', error);
+    }
+}
+
+// 获取 AI 问候语
+async function fetchGreeting() {
+    try {
+        const response = await fetch('/api/greeting');
+        if (response.ok) {
+            const data = await response.json();
+            const greetingEl = document.getElementById('greetingText');
+            if (greetingEl && data.greeting) {
+                greetingEl.textContent = data.greeting;
+            }
+        }
+    } catch (error) {
+        console.error('获取问候语失败:', error);
+    }
+}
+
+// 切换模式
+function switchMode(mode) {
+    state.currentMode = mode;
+    
+    // 更新按钮状态
+    document.querySelectorAll('.mode-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode === mode);
+    });
+    
+    // 切换餐次选择器显示
+    const mealSelector = document.getElementById('mealSelector');
+    if (mealSelector) {
+        mealSelector.classList.toggle('hidden', mode === 'chat');
+    }
+    
+    // 更新输入框提示
+    if (messageInput) {
+        messageInput.placeholder = mode === 'food' 
+            ? '输入您的饮食内容...' 
+            : '向我咨询饮食建议...';
+    }
+}
 
 // 检查 API 配置状态
 async function checkApiStatus() {
@@ -49,13 +120,498 @@ function initMealSelector() {
 
 // 初始化输入处理
 function initInputHandler() {
-    messageInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            sendMessage();
-        }
+    if (messageInput) {
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+    }
+}
+
+// 初始化模态框
+function initModals() {
+    // 关闭按钮
+    document.querySelectorAll('.modal-close').forEach(btn => {
+        btn.addEventListener('click', () => {
+            btn.closest('.modal').classList.remove('active');
+        });
+    });
+    
+    // 点击背景关闭
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.classList.remove('active');
+            }
+        });
     });
 }
+
+// ==================== 饮食记录功能 ====================
+
+// 加载饮食记录
+async function loadMealRecords() {
+    try {
+        const response = await fetch('/api/meals');
+        if (response.ok) {
+            const records = await response.json();
+            renderMealRecords(records);
+        }
+    } catch (error) {
+        console.error('加载饮食记录失败:', error);
+    }
+}
+
+// 渲染饮食记录列表
+function renderMealRecords(records) {
+    const recordsList = document.getElementById('recordsList');
+    if (!recordsList) return;
+    
+    if (records.length === 0) {
+        recordsList.innerHTML = '<div class="empty-tip">暂无饮食记录</div>';
+        return;
+    }
+    
+    recordsList.innerHTML = records.map(record => {
+        const mealIcons = {
+            '早餐': '🌅',
+            '午餐': '☀️',
+            '晚餐': '🌙',
+            '零食': '🍪'
+        };
+        const icon = mealIcons[record.meal_type] || '🍽️';
+        const date = new Date(record.created_at).toLocaleDateString('zh-CN', {
+            month: 'numeric',
+            day: 'numeric'
+        });
+        
+        // 解析食物列表并生成显示文本
+        let foods = [];
+        try {
+            foods = Array.isArray(record.foods) ? record.foods : [];
+        } catch(e) {
+            foods = [];
+        }
+        const foodsText = foods.map(f => f.name).join('、') || '无详情';
+        
+        return `
+            <div class="record-item" data-id="${record.id}">
+                <div class="record-header">
+                    <span class="record-icon">${icon}</span>
+                    <span class="record-type">${record.meal_type}</span>
+                    <span class="record-date">${date}</span>
+                    <span class="record-calories">${record.total_calories} 卡</span>
+                </div>
+                <div class="record-foods">${escapeHtml(foodsText)}</div>
+                <button class="record-delete" onclick="deleteMealRecord(${record.id})">删除</button>
+            </div>
+        `;
+    }).join('');
+}
+
+// 删除饮食记录
+async function deleteMealRecord(recordId) {
+    if (!confirm('确定要删除这条记录吗？')) return;
+    
+    try {
+        const response = await fetch(`/api/meals/${recordId}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            loadMealRecords();
+        } else {
+            alert('删除失败，请重试');
+        }
+    } catch (error) {
+        console.error('删除记录失败:', error);
+        alert('删除失败，请重试');
+    }
+}
+
+// 保存饮食记录
+async function saveMealRecord(mealType, totalCalories, foods, advice) {
+    try {
+        const response = await fetch('/api/meals', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                meal_type: mealType,
+                total_calories: totalCalories,
+                foods: foods,
+                advice: advice
+            })
+        });
+        
+        if (response.ok) {
+            loadMealRecords();
+        }
+    } catch (error) {
+        console.error('保存饮食记录失败:', error);
+    }
+}
+
+// ==================== 消息功能 ====================
+
+// 加载消息
+async function loadMessages() {
+    try {
+        const response = await fetch('/api/messages');
+        if (response.ok) {
+            const messages = await response.json();
+            renderMessages(messages);
+        }
+    } catch (error) {
+        console.error('加载消息失败:', error);
+    }
+}
+
+// 渲染消息列表
+function renderMessages(messages) {
+    const messagesList = document.getElementById('messagesList');
+    if (!messagesList) return;
+    
+    if (messages.length === 0) {
+        messagesList.innerHTML = '<div class="empty-tip">暂无留言</div>';
+        return;
+    }
+    
+    messagesList.innerHTML = messages.map(msg => {
+        const date = new Date(msg.created_at).toLocaleDateString('zh-CN', {
+            month: 'numeric',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: 'numeric'
+        });
+        const isFromMe = state.currentUser && msg.sender_id === state.currentUser.id;
+        const friendId = isFromMe ? msg.receiver_id : msg.sender_id;
+        
+        return `
+            <div class="message-item clickable" onclick="goToFriend(${friendId})">
+                <div class="message-header">
+                    <span class="message-sender">${isFromMe ? '我' : msg.sender_name}</span>
+                    <span class="message-time">${date}</span>
+                </div>
+                <div class="message-text">${escapeHtml(msg.content)}</div>
+            </div>
+        `;
+    }).join('');
+}
+
+// 跳转到好友页面
+function goToFriend(friendId) {
+    // 将好友 ID 存储到 sessionStorage，供好友页面使用
+    sessionStorage.setItem('openFriendId', friendId);
+    window.location.href = '/friends';
+}
+
+// ==================== 设置功能 ====================
+
+// 打开设置模态框
+function openSettingsModal() {
+    const modal = document.getElementById('settingsModal');
+    if (!modal || !state.currentUser) return;
+    
+    // 填充当前用户信息
+    document.getElementById('settingsHeight').value = state.currentUser.height || '';
+    document.getElementById('settingsWeight').value = state.currentUser.weight || '';
+    document.getElementById('settingsGoal').value = state.currentUser.goal || '保持体重';
+    
+    modal.classList.add('active');
+}
+
+// 保存设置
+async function saveSettings() {
+    const height = document.getElementById('settingsHeight').value;
+    const weight = document.getElementById('settingsWeight').value;
+    const goal = document.getElementById('settingsGoal').value;
+    
+    try {
+        const response = await fetch('/api/profile', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ height, weight, goal })
+        });
+        
+        if (response.ok) {
+            const updatedUser = await response.json();
+            state.currentUser = updatedUser;
+            document.getElementById('settingsModal').classList.remove('active');
+            alert('设置已保存');
+        } else {
+            alert('保存失败，请重试');
+        }
+    } catch (error) {
+        console.error('保存设置失败:', error);
+        alert('保存失败，请重试');
+    }
+}
+
+// ==================== 好友功能 ====================
+
+// 打开好友模态框
+async function openFriendsModal() {
+    const modal = document.getElementById('friendsModal');
+    if (!modal) return;
+    
+    // 显示邀请码
+    if (state.currentUser) {
+        const inviteCodeEl = document.getElementById('myInviteCode');
+        if (inviteCodeEl) {
+            inviteCodeEl.textContent = state.currentUser.invite_code;
+        }
+    }
+    
+    // 加载好友列表
+    await loadFriends();
+    
+    modal.classList.add('active');
+}
+
+// 加载好友列表
+async function loadFriends() {
+    try {
+        const response = await fetch('/api/friends');
+        if (response.ok) {
+            state.friends = await response.json();
+            renderFriendsList();
+        }
+    } catch (error) {
+        console.error('加载好友列表失败:', error);
+    }
+}
+
+// 渲染好友列表
+function renderFriendsList() {
+    const friendsList = document.getElementById('friendsList');
+    if (!friendsList) return;
+    
+    if (state.friends.length === 0) {
+        friendsList.innerHTML = '<div class="empty-tip">暂无好友，输入邀请码添加好友吧</div>';
+        return;
+    }
+    
+    friendsList.innerHTML = state.friends.map(friend => `
+        <div class="friend-item" onclick="openFriendDetail(${friend.id})">
+            <div class="friend-avatar">${friend.username.charAt(0).toUpperCase()}</div>
+            <div class="friend-info">
+                <div class="friend-name">${escapeHtml(friend.username)}</div>
+                <div class="friend-goal">${escapeHtml(friend.goal || '未设置目标')}</div>
+            </div>
+        </div>
+    `).join('');
+}
+
+// 添加好友
+async function addFriend() {
+    const inviteCodeInput = document.getElementById('friendInviteCode');
+    const inviteCode = inviteCodeInput.value.trim();
+    
+    if (!inviteCode) {
+        alert('请输入邀请码');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/friends', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ invite_code: inviteCode })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            inviteCodeInput.value = '';
+            await loadFriends();
+            alert('添加好友成功！');
+        } else {
+            alert(result.error || '添加好友失败');
+        }
+    } catch (error) {
+        console.error('添加好友失败:', error);
+        alert('添加好友失败，请重试');
+    }
+}
+
+// 复制邀请码
+function copyInviteCode() {
+    const inviteCode = document.getElementById('myInviteCode').textContent;
+    navigator.clipboard.writeText(inviteCode).then(() => {
+        alert('邀请码已复制到剪贴板');
+    }).catch(() => {
+        alert('复制失败，请手动复制');
+    });
+}
+
+// ==================== 好友详情功能 ====================
+
+// 打开好友详情
+async function openFriendDetail(friendId) {
+    state.selectedFriend = state.friends.find(f => f.id === friendId);
+    if (!state.selectedFriend) return;
+    
+    const modal = document.getElementById('friendDetailModal');
+    if (!modal) return;
+    
+    // 更新好友信息
+    document.getElementById('friendDetailName').textContent = state.selectedFriend.username;
+    document.getElementById('friendDetailGoal').textContent = state.selectedFriend.goal || '未设置目标';
+    
+    // 加载好友饮食记录
+    await loadFriendMeals(friendId);
+    
+    // 加载与该好友的消息
+    await loadFriendMessages(friendId);
+    
+    // 关闭好友列表模态框
+    document.getElementById('friendsModal').classList.remove('active');
+    
+    modal.classList.add('active');
+}
+
+// 加载好友饮食记录
+async function loadFriendMeals(friendId) {
+    try {
+        const response = await fetch(`/api/friends/${friendId}/meals`);
+        if (response.ok) {
+            const meals = await response.json();
+            renderFriendMeals(meals);
+        }
+    } catch (error) {
+        console.error('加载好友饮食记录失败:', error);
+    }
+}
+
+// 渲染好友饮食记录
+function renderFriendMeals(meals) {
+    const mealsList = document.getElementById('friendMealsList');
+    if (!mealsList) return;
+    
+    if (meals.length === 0) {
+        mealsList.innerHTML = '<div class="empty-tip">该好友暂无饮食记录</div>';
+        return;
+    }
+    
+    const mealIcons = {
+        '早餐': '🌅',
+        '午餐': '☀️',
+        '晚餐': '🌙',
+        '零食': '🍪'
+    };
+    
+    mealsList.innerHTML = meals.map(meal => {
+        const icon = mealIcons[meal.meal_type] || '🍽️';
+        const date = new Date(meal.created_at).toLocaleDateString('zh-CN', {
+            month: 'numeric',
+            day: 'numeric'
+        });
+        
+        return `
+            <div class="friend-meal-item">
+                <span class="meal-icon">${icon}</span>
+                <span class="meal-type">${meal.meal_type}</span>
+                <span class="meal-date">${date}</span>
+                <span class="meal-calories">${meal.total_calories} 卡</span>
+            </div>
+        `;
+    }).join('');
+}
+
+// 加载与好友的消息
+async function loadFriendMessages(friendId) {
+    try {
+        const response = await fetch(`/api/messages?friend_id=${friendId}`);
+        if (response.ok) {
+            const messages = await response.json();
+            renderFriendChatMessages(messages);
+        }
+    } catch (error) {
+        console.error('加载消息失败:', error);
+    }
+}
+
+// 渲染好友聊天消息
+function renderFriendChatMessages(messages) {
+    const chatContainer = document.getElementById('friendChatMessages');
+    if (!chatContainer) return;
+    
+    if (messages.length === 0) {
+        chatContainer.innerHTML = '<div class="empty-tip">暂无消息，发送一条消息吧</div>';
+        return;
+    }
+    
+    chatContainer.innerHTML = messages.map(msg => {
+        const isFromMe = state.currentUser && msg.sender_id === state.currentUser.id;
+        const time = new Date(msg.created_at).toLocaleTimeString('zh-CN', {
+            hour: 'numeric',
+            minute: 'numeric'
+        });
+        
+        return `
+            <div class="chat-message ${isFromMe ? 'sent' : 'received'}">
+                <div class="chat-bubble">${escapeHtml(msg.content)}</div>
+                <div class="chat-time">${time}</div>
+            </div>
+        `;
+    }).join('');
+    
+    // 滚动到底部
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+}
+
+// 发送消息给好友
+async function sendFriendMessage() {
+    if (!state.selectedFriend) return;
+    
+    const input = document.getElementById('friendMessageInput');
+    const content = input.value.trim();
+    
+    if (!content) return;
+    
+    try {
+        const response = await fetch('/api/messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                receiver_id: state.selectedFriend.id,
+                content: content
+            })
+        });
+        
+        if (response.ok) {
+            input.value = '';
+            await loadFriendMessages(state.selectedFriend.id);
+            // 同时刷新主页消息列表
+            loadMessages();
+        } else {
+            alert('发送失败，请重试');
+        }
+    } catch (error) {
+        console.error('发送消息失败:', error);
+        alert('发送失败，请重试');
+    }
+}
+
+// ==================== 用户认证 ====================
+
+// 退出登录
+async function logout() {
+    if (!confirm('确定要退出登录吗？')) return;
+    
+    try {
+        const response = await fetch('/api/logout', { method: 'POST' });
+        if (response.ok) {
+            window.location.href = '/auth';
+        }
+    } catch (error) {
+        console.error('退出登录失败:', error);
+    }
+}
+
+// ==================== 聊天功能 ====================
 
 // 发送消息
 async function sendMessage() {
@@ -69,6 +625,51 @@ async function sendMessage() {
         welcomeMsg.remove();
     }
     
+    // 根据模式处理
+    if (state.currentMode === 'chat') {
+        await sendChatMessage(message);
+    } else {
+        await sendFoodMessage(message);
+    }
+}
+
+// 发送饮食咨询消息
+async function sendChatMessage(message) {
+    // 添加用户消息（咨询模式）
+    addUserChatMessage(message);
+    messageInput.value = '';
+    
+    // 显示加载动画
+    state.isLoading = true;
+    sendBtn.disabled = true;
+    const loadingEl = addLoadingIndicator();
+    
+    try {
+        const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: message })
+        });
+        
+        const result = await response.json();
+        loadingEl.remove();
+        
+        if (result.error) {
+            addErrorMessage(result.error);
+        } else {
+            addChatReply(result.reply);
+        }
+    } catch (error) {
+        loadingEl.remove();
+        addErrorMessage('网络错误，请检查网络连接后重试');
+    } finally {
+        state.isLoading = false;
+        sendBtn.disabled = false;
+    }
+}
+
+// 发送食物分析消息
+async function sendFoodMessage(message) {
     // 添加用户消息
     addUserMessage(message, state.currentMeal);
     messageInput.value = '';
@@ -99,6 +700,13 @@ async function sendMessage() {
             addClarificationCard(result);
         } else if (result.status === 'clear') {
             addResultCard(result);
+            // 保存饮食记录
+            saveMealRecord(
+                state.currentMeal,
+                result.total_calories,
+                result.foods,
+                result.dietary_advice
+            );
         }
     } catch (error) {
         loadingEl.remove();
@@ -126,6 +734,58 @@ function addUserMessage(text, mealType) {
     `;
     chatContainer.appendChild(messageEl);
     scrollToBottom();
+}
+
+// 添加用户咨询消息
+function addUserChatMessage(text) {
+    const messageEl = document.createElement('div');
+    messageEl.className = 'message user';
+    messageEl.innerHTML = `
+        <div class="message-label">💬 咨询</div>
+        <div class="message-content">${escapeHtml(text)}</div>
+    `;
+    chatContainer.appendChild(messageEl);
+    scrollToBottom();
+}
+
+// 添加 AI 咨询回复
+function addChatReply(reply) {
+    const messageEl = document.createElement('div');
+    messageEl.className = 'message assistant';
+    messageEl.innerHTML = `
+        <div class="chat-reply">${formatReply(reply)}</div>
+    `;
+    chatContainer.appendChild(messageEl);
+    scrollToBottom();
+}
+
+// 格式化 AI 回复（Markdown 转 HTML）
+function formatReply(text) {
+    // 先转义 HTML
+    let formatted = escapeHtml(text);
+    
+    // 处理加粗 **text** 或 __text__
+    formatted = formatted.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    formatted = formatted.replace(/__(.+?)__/g, '<strong>$1</strong>');
+    
+    // 处理斜体 *text* 或 _text_
+    formatted = formatted.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    formatted = formatted.replace(/_(.+?)_/g, '<em>$1</em>');
+    
+    // 处理数字列表 1. 2. 3.
+    formatted = formatted.replace(/^(\d+)\.\s+/gm, '<span class="list-number">$1.</span> ');
+    
+    // 处理无序列表 - 或 *
+    formatted = formatted.replace(/^[-*]\s+/gm, '<span class="list-bullet">•</span> ');
+    
+    // 处理换行
+    formatted = formatted.replace(/\n\n/g, '</p><p>');
+    formatted = formatted.replace(/\n/g, '<br>');
+    
+    // 包裹在段落中
+    formatted = '<p>' + formatted + '</p>';
+    
+    return formatted;
 }
 
 // 添加加载指示器
@@ -324,6 +984,13 @@ async function confirmClarification() {
             addErrorMessage(result.error);
         } else {
             addResultCard(result);
+            // 保存饮食记录
+            saveMealRecord(
+                state.currentMeal,
+                result.total_calories,
+                result.foods,
+                result.dietary_advice
+            );
         }
     } catch (error) {
         addErrorMessage('网络错误，请重试');
@@ -336,7 +1003,9 @@ async function confirmClarification() {
 
 // 滚动到底部
 function scrollToBottom() {
-    chatContainer.scrollTop = chatContainer.scrollHeight;
+    if (chatContainer) {
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
 }
 
 // HTML 转义

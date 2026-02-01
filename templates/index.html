@@ -7,51 +7,110 @@
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-    <div class="app-container">
+    <div class="main-container">
         <!-- 顶部栏 -->
         <header class="header">
             <h1>饮食助手</h1>
+            <div class="header-actions">
+                <span class="user-name" id="userName"></span>
+                <a href="/settings" class="header-btn" title="设置">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                </a>
+                <a href="/friends" class="header-btn" title="好友">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                </a>
+                <button class="header-btn logout-btn" onclick="handleLogout()" title="退出">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                        <polyline points="16 17 21 12 16 7"></polyline>
+                        <line x1="21" y1="12" x2="9" y2="12"></line>
+                    </svg>
+                </button>
+            </div>
         </header>
 
-        <!-- 餐次选择 -->
-        <div class="meal-selector">
-            <button class="meal-btn active" data-meal="早餐">
-                <span class="meal-icon">🌅</span>
-                <span>早餐</span>
-            </button>
-            <button class="meal-btn" data-meal="午餐">
-                <span class="meal-icon">☀️</span>
-                <span>午餐</span>
-            </button>
-            <button class="meal-btn" data-meal="晚餐">
-                <span class="meal-icon">🌙</span>
-                <span>晚餐</span>
-            </button>
-            <button class="meal-btn" data-meal="零食">
-                <span class="meal-icon">🍪</span>
-                <span>零食</span>
-            </button>
-        </div>
+        <!-- 主体内容 -->
+        <div class="content-wrapper">
+            <!-- 左侧：饮食助手 -->
+            <div class="left-panel">
+                <div class="chat-container" id="chatContainer">
+                    <div class="welcome-message" id="welcomeMessage">
+                        <div class="welcome-icon">🥗</div>
+                        <h2 id="greetingText">欢迎使用饮食助手</h2>
+                        <p>选择餐次记录饮食，或直接向我咨询饮食建议。</p>
+                        <p class="example">例如：两个包子，一杯豆浆 | 或问：减肥应该怎么吃？</p>
+                    </div>
+                </div>
 
-        <!-- 对话区域 -->
-        <div class="chat-container" id="chatContainer">
-            <div class="welcome-message">
-                <div class="welcome-icon">🥗</div>
-                <h2>欢迎使用饮食助手</h2>
-                <p>选择餐次，输入您的饮食内容，我会帮您计算卡路里并给出健康建议。</p>
-                <p class="example">例如：两个包子，一杯豆浆，一个煎蛋</p>
+                <div class="bottom-input-area">
+                    <div class="mode-selector">
+                        <button class="mode-btn active" data-mode="food" onclick="switchMode('food')">
+                            <span>🍽️ 记录饮食</span>
+                        </button>
+                        <button class="mode-btn" data-mode="chat" onclick="switchMode('chat')">
+                            <span>💬 咨询建议</span>
+                        </button>
+                    </div>
+                    <div class="meal-selector" id="mealSelector">
+                        <button class="meal-btn active" data-meal="早餐">
+                            <span class="meal-icon">🌅</span>
+                            <span>早餐</span>
+                        </button>
+                        <button class="meal-btn" data-meal="午餐">
+                            <span class="meal-icon">☀️</span>
+                            <span>午餐</span>
+                        </button>
+                        <button class="meal-btn" data-meal="晚餐">
+                            <span class="meal-icon">🌙</span>
+                            <span>晚餐</span>
+                        </button>
+                        <button class="meal-btn" data-meal="零食">
+                            <span class="meal-icon">🍪</span>
+                            <span>零食</span>
+                        </button>
+                    </div>
+                    <div class="input-container">
+                        <input type="text" id="messageInput" placeholder="输入您的饮食内容..." autocomplete="off">
+                        <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="22" y1="2" x2="11" y2="13"></line>
+                                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
             </div>
-        </div>
 
-        <!-- 输入区域 -->
-        <div class="input-container">
-            <input type="text" id="messageInput" placeholder="输入您的饮食内容..." autocomplete="off">
-            <button class="send-btn" id="sendBtn" onclick="sendMessage()">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="22" y1="2" x2="11" y2="13"></line>
-                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                </svg>
-            </button>
+            <!-- 右侧：记录和留言 -->
+            <div class="right-panel">
+                <!-- 一周饮食记录 -->
+                <div class="panel-section records-section">
+                    <div class="section-header">
+                        <h3>一周饮食记录</h3>
+                    </div>
+                    <div class="records-list" id="recordsList">
+                        <div class="empty-tip">暂无饮食记录</div>
+                    </div>
+                </div>
+
+                <!-- 好友留言 -->
+                <div class="panel-section messages-section">
+                    <div class="section-header">
+                        <h3>好友留言</h3>
+                    </div>
+                    <div class="messages-list" id="messagesList">
+                        <div class="empty-tip">暂无留言</div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 

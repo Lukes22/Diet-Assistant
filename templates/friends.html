@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>好友 - 饮食助手</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="page-body">
+    <div class="page-container">
+        <header class="page-header">
+            <a href="/" class="back-btn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+                返回
+            </a>
+            <h1>好友</h1>
+        </header>
+
+        <div class="page-content">
+            <!-- 添加好友 -->
+            <div class="friends-card">
+                <h3>添加好友</h3>
+                <div class="add-friend-form">
+                    <input type="text" id="inviteCodeInput" placeholder="输入好友邀请码">
+                    <button onclick="addFriend()">添加</button>
+                </div>
+                <div class="error-message" id="addError"></div>
+            </div>
+
+            <!-- 好友列表 -->
+            <div class="friends-card">
+                <h3>好友列表</h3>
+                <div class="friends-list" id="friendsList">
+                    <div class="empty-tip">暂无好友</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 好友详情弹窗 -->
+    <div class="modal" id="friendDetailModal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2 id="friendName">好友详情</h2>
+                <button class="close-btn" onclick="closeFriendDetail()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="friend-info-card">
+                    <p><span>目标:</span> <span id="friendGoal">-</span></p>
+                </div>
+                
+                <div class="friend-meals-section">
+                    <h4>一周饮食记录</h4>
+                    <div class="friend-meals-list" id="friendMealsList">
+                        <div class="empty-tip">暂无记录</div>
+                    </div>
+                </div>
+                
+                <div class="leave-message-section">
+                    <h4>给TA留言</h4>
+                    <div class="message-input-group">
+                        <input type="text" id="messageContent" placeholder="输入留言内容（最多200字）" maxlength="200">
+                        <button onclick="sendMessage()">发送</button>
+                    </div>
+                </div>
+                
+                <div class="chat-history-section">
+                    <h4>留言记录</h4>
+                    <div class="chat-history" id="chatHistory">
+                        <div class="empty-tip">暂无留言</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentFriendId = null;
+        let currentUserId = null;
+
+        // 加载当前用户信息
+        async function loadCurrentUser() {
+            try {
+                const response = await fetch('/api/profile');
+                if (response.ok) {
+                    const user = await response.json();
+                    currentUserId = user.id;
+                } else {
+                    window.location.href = '/auth';
+                }
+            } catch (error) {
+                console.error('加载用户信息失败:', error);
+            }
+        }
+
+        // 加载好友列表
+        async function loadFriends() {
+            try {
+                const response = await fetch('/api/friends');
+                if (response.ok) {
+                    const friends = await response.json();
+                    renderFriends(friends);
+                }
+            } catch (error) {
+                console.error('加载好友列表失败:', error);
+            }
+        }
+
+        // 渲染好友列表
+        function renderFriends(friends) {
+            const list = document.getElementById('friendsList');
+            
+            if (friends.length === 0) {
+                list.innerHTML = '<div class="empty-tip">暂无好友，输入邀请码添加好友吧</div>';
+                return;
+            }
+            
+            const goalMap = {
+                'lose_weight': '减重',
+                'gain_muscle': '增肌',
+                'maintain': '保持规律饮食'
+            };
+            
+            list.innerHTML = friends.map(friend => `
+                <div class="friend-item" onclick="openFriendDetail(${friend.id}, '${escapeHtml(friend.username)}', '${friend.goal || ''}')">
+                    <div class="friend-avatar">${friend.username.charAt(0).toUpperCase()}</div>
+                    <div class="friend-info">
+                        <div class="friend-name">${escapeHtml(friend.username)}</div>
+                        <div class="friend-goal">${goalMap[friend.goal] || '未设置目标'}</div>
+                    </div>
+                    <svg class="arrow-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                </div>
+            `).join('');
+        }
+
+        // 添加好友
+        async function addFriend() {
+            const input = document.getElementById('inviteCodeInput');
+            const code = input.value.trim();
+            const errorEl = document.getElementById('addError');
+            
+            if (!code) {
+                errorEl.textContent = '请输入邀请码';
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/friends', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ invite_code: code })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    input.value = '';
+                    errorEl.textContent = '';
+                    alert('添加好友成功！');
+                    loadFriends();
+                } else {
+                    errorEl.textContent = result.error || '添加失败';
+                }
+            } catch (error) {
+                console.error('添加好友失败:', error);
+                errorEl.textContent = '网络错误，请重试';
+            }
+        }
+
+        // 打开好友详情
+        async function openFriendDetail(friendId, friendName, friendGoal) {
+            currentFriendId = friendId;
+            
+            const goalMap = {
+                'lose_weight': '减重',
+                'gain_muscle': '增肌',
+                'maintain': '保持规律饮食'
+            };
+            
+            document.getElementById('friendName').textContent = friendName;
+            document.getElementById('friendGoal').textContent = goalMap[friendGoal] || '未设置目标';
+            document.getElementById('friendDetailModal').classList.add('active');
+            
+            // 加载好友饮食记录
+            await loadFriendMeals(friendId);
+            
+            // 加载聊天记录
+            await loadChatHistory(friendId);
+        }
+
+        // 关闭好友详情
+        function closeFriendDetail() {
+            document.getElementById('friendDetailModal').classList.remove('active');
+            currentFriendId = null;
+        }
+
+        // 加载好友饮食记录
+        async function loadFriendMeals(friendId) {
+            try {
+                const response = await fetch(`/api/friends/${friendId}/meals`);
+                if (response.ok) {
+                    const meals = await response.json();
+                    renderFriendMeals(meals);
+                }
+            } catch (error) {
+                console.error('加载好友饮食记录失败:', error);
+            }
+        }
+
+        // 渲染好友饮食记录
+        function renderFriendMeals(meals) {
+            const list = document.getElementById('friendMealsList');
+            
+            if (meals.length === 0) {
+                list.innerHTML = '<div class="empty-tip">暂无记录</div>';
+                return;
+            }
+            
+            const mealIcons = {
+                '早餐': '🌅',
+                '午餐': '☀️',
+                '晚餐': '🌙',
+                '零食': '🍪'
+            };
+            
+            list.innerHTML = meals.map(meal => {
+                const icon = mealIcons[meal.meal_type] || '🍽️';
+                const date = new Date(meal.created_at).toLocaleDateString('zh-CN', {
+                    month: 'numeric',
+                    day: 'numeric'
+                });
+                
+                // 解析食物列表
+                let foods = [];
+                try {
+                    foods = typeof meal.foods === 'string' ? JSON.parse(meal.foods) : (meal.foods || []);
+                } catch(e) {
+                    foods = [];
+                }
+                
+                const foodsText = foods.map(f => f.name).join('、') || '无详情';
+                
+                return `
+                    <div class="meal-record-item">
+                        <div class="meal-header">
+                            <span class="meal-icon">${icon}</span>
+                            <span class="meal-type">${meal.meal_type}</span>
+                            <span class="meal-date">${date}</span>
+                            <span class="meal-calories">${meal.total_calories} 卡</span>
+                        </div>
+                        <div class="meal-foods">${escapeHtml(foodsText)}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 加载聊天记录
+        async function loadChatHistory(friendId) {
+            try {
+                const response = await fetch(`/api/messages?friend_id=${friendId}`);
+                if (response.ok) {
+                    const messages = await response.json();
+                    renderChatHistory(messages);
+                }
+            } catch (error) {
+                console.error('加载聊天记录失败:', error);
+            }
+        }
+
+        // 渲染聊天记录
+        function renderChatHistory(messages) {
+            const container = document.getElementById('chatHistory');
+            
+            if (messages.length === 0) {
+                container.innerHTML = '<div class="empty-tip">暂无留言</div>';
+                return;
+            }
+            
+            container.innerHTML = messages.map(msg => {
+                const isFromMe = msg.sender_id === currentUserId;
+                const time = new Date(msg.created_at).toLocaleString('zh-CN', {
+                    month: 'numeric',
+                    day: 'numeric',
+                    hour: 'numeric',
+                    minute: 'numeric'
+                });
+                
+                return `
+                    <div class="chat-message ${isFromMe ? 'sent' : 'received'}">
+                        <div class="chat-sender">${isFromMe ? '我' : msg.sender_name}</div>
+                        <div class="chat-bubble">${escapeHtml(msg.content)}</div>
+                        <div class="chat-time">${time}</div>
+                    </div>
+                `;
+            }).join('');
+            
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // 发送留言
+        async function sendMessage() {
+            if (!currentFriendId) return;
+            
+            const input = document.getElementById('messageContent');
+            const content = input.value.trim();
+            
+            if (!content) {
+                alert('请输入留言内容');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/messages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        receiver_id: currentFriendId,
+                        content: content
+                    })
+                });
+                
+                if (response.ok) {
+                    input.value = '';
+                    await loadChatHistory(currentFriendId);
+                } else {
+                    alert('发送失败，请重试');
+                }
+            } catch (error) {
+                console.error('发送留言失败:', error);
+                alert('发送失败，请重试');
+            }
+        }
+
+        // HTML 转义
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // 点击模态框背景关闭
+        document.getElementById('friendDetailModal').addEventListener('click', (e) => {
+            if (e.target.id === 'friendDetailModal') {
+                closeFriendDetail();
+            }
+        });
+
+        // 检查是否需要自动打开好友详情
+        async function checkAutoOpenFriend() {
+            const openFriendId = sessionStorage.getItem('openFriendId');
+            if (openFriendId) {
+                sessionStorage.removeItem('openFriendId');
+                // 等待好友列表加载完成
+                await loadFriends();
+                // 查找好友信息
+                const response = await fetch('/api/friends');
+                if (response.ok) {
+                    const friends = await response.json();
+                    const friend = friends.find(f => f.id === parseInt(openFriendId));
+                    if (friend) {
+                        openFriendDetail(friend.id, friend.username, friend.goal || '');
+                    }
+                }
+            }
+        }
+
+        // 初始化
+        loadCurrentUser();
+        loadFriends().then(() => {
+            checkAutoOpenFriend();
+        });
+    </script>
+</body>
+</html>

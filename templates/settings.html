@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>个人设置 - 饮食助手</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="page-body">
+    <div class="page-container">
+        <header class="page-header">
+            <a href="/" class="back-btn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+                返回
+            </a>
+            <h1>个人设置</h1>
+        </header>
+
+        <div class="page-content">
+            <div class="settings-card">
+                <div class="user-avatar">
+                    <span id="userAvatar">U</span>
+                </div>
+                <div class="username-display" id="usernameDisplay">用户名</div>
+                
+                <form class="settings-form" id="settingsForm">
+                    <div class="form-group">
+                        <label for="gender">性别</label>
+                        <select id="gender" name="gender">
+                            <option value="male">男</option>
+                            <option value="female">女</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="height">身高 (cm)</label>
+                        <input type="number" id="height" name="height" placeholder="170" min="100" max="250">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="weight">体重 (kg)</label>
+                        <input type="number" id="weight" name="weight" placeholder="65" min="30" max="300" step="0.1">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="goal">健康目标</label>
+                        <select id="goal" name="goal">
+                            <option value="lose_weight">减重</option>
+                            <option value="gain_muscle">增肌</option>
+                            <option value="maintain">保持规律饮食</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="submit" class="save-btn">保存设置</button>
+                    </div>
+                </form>
+                
+                <div class="invite-code-card">
+                    <label>我的邀请码</label>
+                    <div class="invite-code-display">
+                        <span id="inviteCode">--------</span>
+                        <button type="button" class="copy-btn" onclick="copyInviteCode()">复制</button>
+                    </div>
+                    <p class="invite-tip">分享邀请码给好友，互相查看饮食记录</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 加载用户信息
+        async function loadUserProfile() {
+            try {
+                const response = await fetch('/api/profile');
+                if (response.ok) {
+                    const user = await response.json();
+                    document.getElementById('userAvatar').textContent = user.username.charAt(0).toUpperCase();
+                    document.getElementById('usernameDisplay').textContent = user.username;
+                    document.getElementById('gender').value = user.gender || 'male';
+                    document.getElementById('height').value = user.height || '';
+                    document.getElementById('weight').value = user.weight || '';
+                    document.getElementById('goal').value = user.goal || 'maintain';
+                    document.getElementById('inviteCode').textContent = user.invite_code;
+                } else {
+                    window.location.href = '/auth';
+                }
+            } catch (error) {
+                console.error('加载用户信息失败:', error);
+            }
+        }
+
+        // 保存设置
+        document.getElementById('settingsForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const data = {
+                gender: document.getElementById('gender').value,
+                height: parseFloat(document.getElementById('height').value) || null,
+                weight: parseFloat(document.getElementById('weight').value) || null,
+                goal: document.getElementById('goal').value
+            };
+            
+            try {
+                const response = await fetch('/api/profile', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                if (response.ok) {
+                    alert('设置已保存');
+                } else {
+                    alert('保存失败，请重试');
+                }
+            } catch (error) {
+                console.error('保存设置失败:', error);
+                alert('保存失败，请重试');
+            }
+        });
+
+        // 复制邀请码
+        function copyInviteCode() {
+            const code = document.getElementById('inviteCode').textContent;
+            navigator.clipboard.writeText(code).then(() => {
+                alert('邀请码已复制');
+            }).catch(() => {
+                // 降级方案
+                const input = document.createElement('input');
+                input.value = code;
+                document.body.appendChild(input);
+                input.select();
+                document.execCommand('copy');
+                document.body.removeChild(input);
+                alert('邀请码已复制');
+            });
+        }
+
+        // 初始化
+        loadUserProfile();
+    </script>
+</body>
+</html>
