@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理后台 - 食友记</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .admin-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e8f5e9;
+        }
+        .admin-header h1 {
+            color: #2e7d32;
+            font-size: 24px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #43a047 0%, #2e7d32 100%);
+            color: #fff;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+        }
+        .stat-card.secondary {
+            background: linear-gradient(135deg, #66bb6a 0%, #43a047 100%);
+        }
+        .stat-card.warning {
+            background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+        }
+        .stat-card.info {
+            background: linear-gradient(135deg, #29b6f6 0%, #0288d1 100%);
+        }
+        .stat-value {
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+        .stat-label {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        .stat-sub {
+            font-size: 12px;
+            opacity: 0.7;
+            margin-top: 8px;
+        }
+        .admin-section {
+            background: #fff;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .admin-section h2 {
+            font-size: 18px;
+            color: #333;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .admin-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .admin-table th,
+        .admin-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        .admin-table th {
+            background: #f5f5f5;
+            font-weight: 500;
+            color: #666;
+        }
+        .admin-table tr:hover {
+            background: #f9f9f9;
+        }
+        .feedback-type {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .feedback-type.like {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        .feedback-type.dislike {
+            background: #ffebee;
+            color: #c62828;
+        }
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .tab-btn {
+            padding: 10px 20px;
+            border: none;
+            background: #f5f5f5;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .tab-btn.active {
+            background: #43a047;
+            color: #fff;
+        }
+        .tab-btn:hover:not(.active) {
+            background: #e8f5e9;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .logout-link {
+            color: #666;
+            text-decoration: none;
+            padding: 8px 16px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+        }
+        .logout-link:hover {
+            background: #f5f5f5;
+        }
+        .query-text, .response-text {
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .reason-text {
+            max-width: 150px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: #666;
+        }
+    </style>
+</head>
+<body style="background: #f5f5f5;">
+    <div class="admin-container">
+        <header class="admin-header">
+            <h1>🥗 食友记 - 管理后台</h1>
+            <a href="#" class="logout-link" onclick="handleLogout()">退出登录</a>
+        </header>
+
+        <!-- 统计卡片 -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="totalUsers">-</div>
+                <div class="stat-label">总用户数</div>
+                <div class="stat-sub">今日新增: <span id="todayUsers">0</span></div>
+            </div>
+            <div class="stat-card secondary">
+                <div class="stat-value" id="totalMeals">-</div>
+                <div class="stat-label">饮食记录数</div>
+                <div class="stat-sub">今日新增: <span id="todayMeals">0</span></div>
+            </div>
+            <div class="stat-card info">
+                <div class="stat-value" id="totalFeedbacks">-</div>
+                <div class="stat-label">AI 反馈数</div>
+                <div class="stat-sub">👍 <span id="likeFeedbacks">0</span> / 👎 <span id="dislikeFeedbacks">0</span></div>
+            </div>
+            <div class="stat-card warning">
+                <div class="stat-value" id="totalMessages">-</div>
+                <div class="stat-label">好友留言数</div>
+            </div>
+        </div>
+
+        <!-- 标签页 -->
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('users')">用户列表</button>
+            <button class="tab-btn" onclick="switchTab('feedbacks')">AI 反馈</button>
+        </div>
+
+        <!-- 用户列表 -->
+        <div class="tab-content active" id="usersTab">
+            <div class="admin-section">
+                <h2>用户列表</h2>
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>用户名</th>
+                            <th>健康目标</th>
+                            <th>饮食记录数</th>
+                            <th>注册时间</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersList">
+                        <tr><td colspan="5" style="text-align:center;">加载中...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- AI 反馈列表 -->
+        <div class="tab-content" id="feedbacksTab">
+            <div class="admin-section">
+                <h2>AI 回答反馈</h2>
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>用户</th>
+                            <th>模式</th>
+                            <th>用户问题</th>
+                            <th>AI 回答</th>
+                            <th>反馈</th>
+                            <th>原因</th>
+                            <th>时间</th>
+                        </tr>
+                    </thead>
+                    <tbody id="feedbacksList">
+                        <tr><td colspan="7" style="text-align:center;">加载中...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 加载统计数据
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/admin/stats');
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('totalUsers').textContent = data.users.total;
+                    document.getElementById('todayUsers').textContent = data.users.today;
+                    document.getElementById('totalMeals').textContent = data.meals.total;
+                    document.getElementById('todayMeals').textContent = data.meals.today;
+                    document.getElementById('totalFeedbacks').textContent = data.ai_feedbacks.total;
+                    document.getElementById('likeFeedbacks').textContent = data.ai_feedbacks.likes;
+                    document.getElementById('dislikeFeedbacks').textContent = data.ai_feedbacks.dislikes;
+                    document.getElementById('totalMessages').textContent = data.messages.total;
+                } else if (response.status === 403) {
+                    window.location.href = '/';
+                }
+            } catch (error) {
+                console.error('加载统计失败:', error);
+            }
+        }
+
+        // 加载用户列表
+        async function loadUsers() {
+            try {
+                const response = await fetch('/api/admin/users');
+                if (response.ok) {
+                    const users = await response.json();
+                    renderUsers(users);
+                }
+            } catch (error) {
+                console.error('加载用户失败:', error);
+            }
+        }
+
+        // 渲染用户列表
+        function renderUsers(users) {
+            const tbody = document.getElementById('usersList');
+            const goalMap = {
+                'lose_weight': '减重',
+                'gain_muscle': '增肌',
+                'maintain': '保持规律'
+            };
+            
+            if (users.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">暂无用户</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = users.map(user => `
+                <tr>
+                    <td>${user.id}</td>
+                    <td>${user.username}</td>
+                    <td>${goalMap[user.goal] || '-'}</td>
+                    <td>${user.meal_count}</td>
+                    <td>${user.created_at}</td>
+                </tr>
+            `).join('');
+        }
+
+        // 加载反馈列表
+        async function loadFeedbacks() {
+            try {
+                const response = await fetch('/api/admin/feedbacks');
+                if (response.ok) {
+                    const feedbacks = await response.json();
+                    renderFeedbacks(feedbacks);
+                }
+            } catch (error) {
+                console.error('加载反馈失败:', error);
+            }
+        }
+
+        // 渲染反馈列表
+        function renderFeedbacks(feedbacks) {
+            const tbody = document.getElementById('feedbacksList');
+            const modeMap = { 'food': '饮食分析', 'chat': '咨询建议' };
+            
+            if (feedbacks.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">暂无反馈</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = feedbacks.map(f => `
+                <tr>
+                    <td>${f.username}</td>
+                    <td>${modeMap[f.mode] || f.mode}</td>
+                    <td class="query-text" title="${escapeHtml(f.query)}">${escapeHtml(f.query)}</td>
+                    <td class="response-text" title="${escapeHtml(f.response)}">${escapeHtml(f.response)}</td>
+                    <td><span class="feedback-type ${f.feedback_type}">${f.feedback_type === 'like' ? '👍 好评' : '👎 差评'}</span></td>
+                    <td class="reason-text" title="${f.reason ? escapeHtml(f.reason) : ''}">${f.reason ? escapeHtml(f.reason) : '-'}</td>
+                    <td>${f.created_at}</td>
+                </tr>
+            `).join('');
+        }
+
+        // 切换标签页
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(tab + 'Tab').classList.add('active');
+            
+            if (tab === 'feedbacks') {
+                loadFeedbacks();
+            }
+        }
+
+        // 退出登录
+        async function handleLogout() {
+            try {
+                await fetch('/api/logout', { method: 'POST' });
+                window.location.href = '/auth';
+            } catch (error) {
+                console.error('退出失败:', error);
+            }
+        }
+
+        // HTML 转义
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // 初始化
+        loadStats();
+        loadUsers();
+    </script>
+</body>
+</html>
