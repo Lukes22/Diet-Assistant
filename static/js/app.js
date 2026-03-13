@@ -1254,3 +1254,259 @@ document.addEventListener('DOMContentLoaded', () => {
 window.openShareModal = openShareModal;
 window.closeShareModal = closeShareModal;
 window.downloadShareImage = downloadShareImage;
+
+// ==================== 拍照识别功能 ====================
+
+// 相机状态
+let cameraStream = null;
+let capturedImageBase64 = null;
+
+// 打开拍照弹窗
+function openCameraModal() {
+    capturedImageBase64 = null;
+    const modal = document.getElementById('cameraModal');
+    const choose = document.getElementById('cameraChoose');
+    const preview = document.getElementById('cameraPreview');
+    const imageArea = document.getElementById('imagePreviewArea');
+
+    // 重置到初始选择界面
+    choose.style.display = 'flex';
+    preview.style.display = 'none';
+    imageArea.style.display = 'none';
+
+    modal.classList.add('active');
+}
+
+// 关闭拍照弹窗
+function closeCameraModal() {
+    stopCamera();
+    capturedImageBase64 = null;
+    document.getElementById('cameraModal').classList.remove('active');
+    // 重置文件输入
+    document.getElementById('imageFileInput').value = '';
+}
+
+// 停止摄像头
+function stopCamera() {
+    if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+        cameraStream = null;
+    }
+    const video = document.getElementById('cameraVideo');
+    if (video) {
+        video.srcObject = null;
+    }
+}
+
+// 启动摄像头
+async function startCamera() {
+    const choose = document.getElementById('cameraChoose');
+    const preview = document.getElementById('cameraPreview');
+    const video = document.getElementById('cameraVideo');
+
+    try {
+        cameraStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 960 } }
+        });
+        video.srcObject = cameraStream;
+        choose.style.display = 'none';
+        preview.style.display = 'flex';
+    } catch (err) {
+        alert('无法访问摄像头，请检查权限设置或使用"从相册选择"');
+        console.error('摄像头访问失败:', err);
+    }
+}
+
+// 拍照
+function capturePhoto() {
+    const video = document.getElementById('cameraVideo');
+    const canvas = document.getElementById('cameraCanvas');
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0);
+
+    // 压缩为 JPEG base64
+    const dataUrl = compressCanvas(canvas, 1280, 1280, 0.8);
+    capturedImageBase64 = dataUrl.split(',')[1];
+
+    // 停止摄像头，显示预览
+    stopCamera();
+    document.getElementById('cameraPreview').style.display = 'none';
+    const imageArea = document.getElementById('imagePreviewArea');
+    document.getElementById('previewImage').src = dataUrl;
+    imageArea.style.display = 'flex';
+}
+
+// 压缩 Canvas 到指定最大尺寸
+function compressCanvas(sourceCanvas, maxWidth, maxHeight, quality) {
+    let width = sourceCanvas.width;
+    let height = sourceCanvas.height;
+
+    if (width > maxWidth || height > maxHeight) {
+        const ratio = Math.min(maxWidth / width, maxHeight / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(sourceCanvas, 0, 0, width, height);
+
+    return canvas.toDataURL('image/jpeg', quality);
+}
+
+// 处理文件上传
+async function handleImageUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // 验证文件类型
+    if (!file.type.startsWith('image/')) {
+        alert('请选择图片文件');
+        return;
+    }
+
+    // 验证文件大小（原始最大 10MB）
+    if (file.size > 10 * 1024 * 1024) {
+        alert('图片过大，请选择小于10MB的图片');
+        return;
+    }
+
+    try {
+        const dataUrl = await compressImageFile(file, 1280, 1280, 0.8);
+        capturedImageBase64 = dataUrl.split(',')[1];
+
+        // 显示预览
+        document.getElementById('cameraChoose').style.display = 'none';
+        document.getElementById('cameraPreview').style.display = 'none';
+        const imageArea = document.getElementById('imagePreviewArea');
+        document.getElementById('previewImage').src = dataUrl;
+        imageArea.style.display = 'flex';
+    } catch (err) {
+        alert('图片处理失败，请重试');
+        console.error('图片处理失败:', err);
+    }
+}
+
+// 压缩图片文件
+function compressImageFile(file, maxWidth, maxHeight, quality) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            let width = img.width;
+            let height = img.height;
+
+            if (width > maxWidth || height > maxHeight) {
+                const ratio = Math.min(maxWidth / width, maxHeight / height);
+                width = Math.round(width * ratio);
+                height = Math.round(height * ratio);
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            const dataUrl = canvas.toDataURL('image/jpeg', quality);
+            URL.revokeObjectURL(img.src);
+            resolve(dataUrl);
+        };
+        img.onerror = () => {
+            URL.revokeObjectURL(img.src);
+            reject(new Error('图片加载失败'));
+        };
+        img.src = URL.createObjectURL(file);
+    });
+}
+
+// 重新拍摄
+function retakePhoto() {
+    capturedImageBase64 = null;
+    document.getElementById('imagePreviewArea').style.display = 'none';
+    document.getElementById('imageFileInput').value = '';
+    // 回到选择界面
+    document.getElementById('cameraChoose').style.display = 'flex';
+}
+
+// 确认照片并发送分析
+function confirmPhoto() {
+    if (!capturedImageBase64) return;
+    const imageBase64 = capturedImageBase64;
+    closeCameraModal();
+    sendVisionMessage(imageBase64);
+}
+
+// 发送视觉分析消息
+async function sendVisionMessage(imageBase64) {
+    // 清除欢迎消息
+    const welcomeMsg = chatContainer.querySelector('.welcome-message');
+    if (welcomeMsg) {
+        welcomeMsg.remove();
+    }
+
+    // 显示用户消息（含缩略图）
+    const mealIcons = {
+        '早餐': '🌅', '午餐': '☀️', '晚餐': '🌙', '零食': '🍪'
+    };
+    const messageEl = document.createElement('div');
+    messageEl.className = 'message user';
+    messageEl.innerHTML = `
+        <div class="message-label">${mealIcons[state.currentMeal] || '🍽️'} ${state.currentMeal} (拍照识别)</div>
+        <img class="user-image-thumbnail" src="data:image/jpeg;base64,${imageBase64}" alt="食物照片">
+    `;
+    chatContainer.appendChild(messageEl);
+    scrollToBottom();
+
+    // 显示加载动画
+    state.isLoading = true;
+    sendBtn.disabled = true;
+    const loadingEl = addLoadingIndicator();
+
+    try {
+        const response = await fetch('/api/analyze-meal-vision', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                meal_type: state.currentMeal,
+                image: imageBase64
+            })
+        });
+
+        const result = await response.json();
+        loadingEl.remove();
+
+        if (result.error) {
+            addErrorMessage(result.error);
+        } else if (result.status === 'need_clarification') {
+            addClarificationCard(result);
+        } else if (result.status === 'clear') {
+            addResultCard(result);
+            saveMealRecord(
+                state.currentMeal,
+                result.total_calories,
+                result.foods,
+                result.dietary_advice
+            );
+        }
+    } catch (error) {
+        loadingEl.remove();
+        addErrorMessage('网络错误，请检查网络连接后重试');
+    } finally {
+        state.isLoading = false;
+        sendBtn.disabled = false;
+    }
+}
+
+// 暴露拍照相关函数到全局作用域
+window.openCameraModal = openCameraModal;
+window.closeCameraModal = closeCameraModal;
+window.startCamera = startCamera;
+window.capturePhoto = capturePhoto;
+window.handleImageUpload = handleImageUpload;
+window.retakePhoto = retakePhoto;
+window.confirmPhoto = confirmPhoto;

@@ -79,6 +79,12 @@
                     </div>
                     <div class="input-container">
                         <input type="text" id="messageInput" placeholder="输入您的饮食内容..." autocomplete="off">
+                        <button class="camera-btn" id="cameraBtn" onclick="openCameraModal()" title="拍照识别">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                                <circle cx="12" cy="13" r="4"></circle>
+                            </svg>
+                        </button>
                         <button class="send-btn" id="sendBtn" onclick="sendMessage()">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <line x1="22" y1="2" x2="11" y2="13"></line>
@@ -108,6 +114,59 @@
                     </div>
                     <div class="messages-list" id="messagesList">
                         <div class="empty-tip">暂无留言</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 拍照识别弹窗 -->
+    <div class="modal" id="cameraModal">
+        <div class="modal-content camera-modal-content">
+            <div class="modal-header">
+                <h2>拍照识别食物</h2>
+                <button class="close-btn" onclick="closeCameraModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- 初始选择界面 -->
+                <div class="camera-choose" id="cameraChoose">
+                    <button class="camera-choose-btn" onclick="startCamera()">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                            <circle cx="12" cy="13" r="4"></circle>
+                        </svg>
+                        <span>打开摄像头</span>
+                    </button>
+                    <button class="camera-choose-btn" onclick="document.getElementById('imageFileInput').click()">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                            <polyline points="21 15 16 10 5 21"></polyline>
+                        </svg>
+                        <span>从相册选择</span>
+                    </button>
+                    <input type="file" id="imageFileInput" accept="image/*" style="display:none" onchange="handleImageUpload(event)">
+                </div>
+
+                <!-- 摄像头预览 -->
+                <div class="camera-preview" id="cameraPreview" style="display:none">
+                    <video id="cameraVideo" autoplay playsinline></video>
+                    <canvas id="cameraCanvas" style="display:none"></canvas>
+                    <div class="camera-actions">
+                        <button class="camera-action-btn capture-btn" onclick="capturePhoto()">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                <circle cx="12" cy="12" r="10"></circle>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 图片预览 -->
+                <div class="image-preview-area" id="imagePreviewArea" style="display:none">
+                    <img id="previewImage" src="" alt="预览">
+                    <div class="camera-actions">
+                        <button class="camera-action-btn retake-btn" onclick="retakePhoto()">重新拍摄</button>
+                        <button class="camera-action-btn confirm-btn" onclick="confirmPhoto()">确认识别</button>
                     </div>
                 </div>
             </div>
