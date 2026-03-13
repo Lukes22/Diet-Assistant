@@ -99,21 +99,31 @@
             <div class="right-panel">
                 <!-- 一周饮食记录 -->
                 <div class="panel-section records-section">
-                    <div class="section-header">
+                    <div class="section-header" onclick="toggleSection(this)">
                         <h3>一周饮食记录</h3>
+                        <svg class="section-toggle" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
                     </div>
-                    <div class="records-list" id="recordsList">
-                        <div class="empty-tip">暂无饮食记录</div>
+                    <div class="section-body">
+                        <div class="records-list" id="recordsList">
+                            <div class="empty-tip">暂无饮食记录</div>
+                        </div>
                     </div>
                 </div>
 
                 <!-- 好友留言 -->
                 <div class="panel-section messages-section">
-                    <div class="section-header">
+                    <div class="section-header" onclick="toggleSection(this)">
                         <h3>好友留言</h3>
+                        <svg class="section-toggle" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
                     </div>
-                    <div class="messages-list" id="messagesList">
-                        <div class="empty-tip">暂无留言</div>
+                    <div class="section-body">
+                        <div class="messages-list" id="messagesList">
+                            <div class="empty-tip">暂无留言</div>
+                        </div>
                     </div>
                 </div>
             </div>

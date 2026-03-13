@@ -19,6 +19,16 @@
         </header>
 
         <div class="page-content">
+            <!-- 我的邀请码 -->
+            <div class="friends-card">
+                <h3>我的邀请码</h3>
+                <div class="invite-code-display">
+                    <span id="myInviteCode">--------</span>
+                    <button type="button" class="copy-btn" onclick="copyInviteCode()">复制</button>
+                </div>
+                <p class="invite-tip">分享邀请码给好友，互相查看饮食记录</p>
+            </div>
+
             <!-- 添加好友 -->
             <div class="friends-card">
                 <h3>添加好友</h3>
@@ -93,6 +103,7 @@
                 if (response.ok) {
                     const user = await response.json();
                     currentUserId = user.id;
+                    document.getElementById('myInviteCode').textContent = user.invite_code;
                 } else {
                     window.location.href = '/auth';
                 }
@@ -461,6 +472,22 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        // 复制邀请码
+        function copyInviteCode() {
+            const code = document.getElementById('myInviteCode').textContent;
+            navigator.clipboard.writeText(code).then(() => {
+                alert('邀请码已复制');
+            }).catch(() => {
+                const input = document.createElement('input');
+                input.value = code;
+                document.body.appendChild(input);
+                input.select();
+                document.execCommand('copy');
+                document.body.removeChild(input);
+                alert('邀请码已复制');
+            });
         }
 
         // 点击模态框背景关闭

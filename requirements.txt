@@ -5,3 +5,4 @@ flask-sqlalchemy
 openai>=1.0
 python-dotenv
 werkzeug
+httpx

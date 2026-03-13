@@ -25,6 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initInputHandler();
     initModals();
     checkApiStatus();
+    initCollapsibleSections();
 });
 
 // 初始化用户信息
@@ -148,6 +149,48 @@ function initModals() {
         });
     });
 }
+
+// ==================== 折叠面板功能 ====================
+
+// 初始化折叠面板（移动端默认折叠两个面板，最大化对话区域）
+function initCollapsibleSections() {
+    if (window.innerWidth <= 900) {
+        document.querySelectorAll('.panel-section').forEach(section => {
+            section.classList.add('collapsed');
+            const header = section.querySelector('.section-header');
+            if (header) header.classList.add('collapsed');
+        });
+        // 初始计算移动端布局高度
+        recalcMobileLayout();
+        window.addEventListener('resize', recalcMobileLayout);
+    }
+}
+
+// 动态计算移动端左侧面板高度，确保填满屏幕
+function recalcMobileLayout() {
+    if (window.innerWidth > 900) return;
+    const header = document.querySelector('.header');
+    const rightPanel = document.querySelector('.right-panel');
+    const leftPanel = document.querySelector('.left-panel');
+    if (!header || !rightPanel || !leftPanel) return;
+
+    const vh = window.innerHeight;
+    const headerH = header.offsetHeight;
+    const rightH = rightPanel.offsetHeight;
+    leftPanel.style.height = (vh - headerH - rightH) + 'px';
+}
+
+// 切换面板展开/折叠
+function toggleSection(headerEl) {
+    const section = headerEl.closest('.panel-section');
+    if (!section) return;
+    section.classList.toggle('collapsed');
+    headerEl.classList.toggle('collapsed');
+    // 展开/折叠后重新计算布局
+    setTimeout(recalcMobileLayout, 50);
+}
+
+window.toggleSection = toggleSection;
 
 // ==================== 饮食记录功能 ====================
 
