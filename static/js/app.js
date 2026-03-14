@@ -10,7 +10,8 @@ const state = {
     pendingClarification: null,
     currentUser: null,
     friends: [],
-    selectedFriend: null
+    selectedFriend: null,
+    nutritionChart: null
 };
 
 // DOM 元素
@@ -45,6 +46,7 @@ async function initUser() {
             // 加载饮食记录和消息
             loadMealRecords();
             loadMessages();
+            loadDailyNutrition();
             
             // 获取 AI 问候语
             fetchGreeting();
@@ -152,7 +154,7 @@ function initModals() {
 
 // ==================== 折叠面板功能 ====================
 
-// 初始化折叠面板（移动端默认折叠两个面板，最大化对话区域）
+// 初始化折叠面板（移动端默认折叠所有面板，最大化对话区域）
 function initCollapsibleSections() {
     if (window.innerWidth <= 900) {
         document.querySelectorAll('.panel-section').forEach(section => {
@@ -160,24 +162,7 @@ function initCollapsibleSections() {
             const header = section.querySelector('.section-header');
             if (header) header.classList.add('collapsed');
         });
-        // 初始计算移动端布局高度
-        recalcMobileLayout();
-        window.addEventListener('resize', recalcMobileLayout);
     }
-}
-
-// 动态计算移动端左侧面板高度，确保填满屏幕
-function recalcMobileLayout() {
-    if (window.innerWidth > 900) return;
-    const header = document.querySelector('.header');
-    const rightPanel = document.querySelector('.right-panel');
-    const leftPanel = document.querySelector('.left-panel');
-    if (!header || !rightPanel || !leftPanel) return;
-
-    const vh = window.innerHeight;
-    const headerH = header.offsetHeight;
-    const rightH = rightPanel.offsetHeight;
-    leftPanel.style.height = (vh - headerH - rightH) + 'px';
 }
 
 // 切换面板展开/折叠
@@ -186,11 +171,119 @@ function toggleSection(headerEl) {
     if (!section) return;
     section.classList.toggle('collapsed');
     headerEl.classList.toggle('collapsed');
-    // 展开/折叠后重新计算布局
-    setTimeout(recalcMobileLayout, 50);
+    // 展开营养图表时触发 resize
+    if (section.classList.contains('nutrition-section') && !section.classList.contains('collapsed') && state.nutritionChart) {
+        setTimeout(() => state.nutritionChart.resize(), 100);
+    }
 }
 
 window.toggleSection = toggleSection;
+
+// ==================== 今日营养图表 ====================
+
+async function loadDailyNutrition() {
+    try {
+        const response = await fetch('/api/daily-nutrition');
+        if (!response.ok) return;
+
+        const data = await response.json();
+        const canvas = document.getElementById('nutritionChart');
+        const emptyEl = document.getElementById('nutritionEmpty');
+        if (!canvas || !emptyEl) return;
+
+        if (!data.has_data) {
+            canvas.style.display = 'none';
+            emptyEl.style.display = 'block';
+            return;
+        }
+
+        canvas.style.display = 'block';
+        emptyEl.style.display = 'none';
+
+        const labels = ['蛋白质(g)', '脂肪(g)', '碳水(g)', '膳食纤维(g)'];
+        const actual = [
+            data.nutrition.protein,
+            data.nutrition.fat,
+            data.nutrition.carbs,
+            data.nutrition.fiber
+        ];
+        const recommended = [
+            data.recommended.protein,
+            data.recommended.fat,
+            data.recommended.carbs,
+            data.recommended.fiber
+        ];
+
+        if (state.nutritionChart) {
+            state.nutritionChart.data.datasets[0].data = actual;
+            state.nutritionChart.data.datasets[1].data = recommended;
+            state.nutritionChart.update();
+        } else {
+            const ctx = canvas.getContext('2d');
+            state.nutritionChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: '实际摄入',
+                            data: actual,
+                            backgroundColor: 'rgba(67, 160, 71, 0.8)',
+                            borderColor: '#43a047',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        },
+                        {
+                            label: '推荐量',
+                            data: recommended,
+                            backgroundColor: 'rgba(200, 200, 200, 0.4)',
+                            borderColor: '#bdbdbd',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                font: { size: 11 },
+                                padding: 12
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                afterBody: function(context) {
+                                    const idx = context[0].dataIndex;
+                                    const act = actual[idx];
+                                    const rec = recommended[idx];
+                                    const pct = rec > 0 ? Math.round(act / rec * 100) : 0;
+                                    return '完成度: ' + pct + '%';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(0,0,0,0.05)' },
+                            ticks: { font: { size: 11 } }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { font: { size: 11 } }
+                        }
+                    }
+                }
+            });
+        }
+    } catch (error) {
+        console.error('加载每日营养数据失败:', error);
+    }
+}
 
 // ==================== 饮食记录功能 ====================
 
@@ -275,6 +368,7 @@ async function deleteMealRecord(recordId) {
         
         if (response.ok) {
             loadMealRecords();
+            loadDailyNutrition();
         } else {
             alert('删除失败，请重试');
         }
@@ -300,6 +394,7 @@ async function saveMealRecord(mealType, totalCalories, foods, advice) {
         
         if (response.ok) {
             loadMealRecords();
+            loadDailyNutrition();
         }
     } catch (error) {
         console.error('保存饮食记录失败:', error);

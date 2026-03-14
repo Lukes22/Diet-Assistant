@@ -239,6 +239,26 @@ body {
     border-bottom: 1px solid #e0e0e0;
 }
 
+.nutrition-section {
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.nutrition-chart-container {
+    padding: 12px;
+    position: relative;
+}
+
+#nutritionChart {
+    max-height: 220px;
+}
+
+.nutrition-empty {
+    text-align: center;
+    color: #999;
+    font-size: 13px;
+    padding: 30px;
+}
+
 .section-header {
     padding: 12px 16px;
     background: #fff;
@@ -1487,50 +1507,56 @@ body {
         display: flex;
         flex-direction: column;
         overflow: hidden;
+        height: 100vh;
     }
     
     .content-wrapper {
-        flex: 1 1 0;
+        flex: 1;
         flex-direction: column;
         display: flex;
         min-height: 0;
         overflow: hidden;
     }
 
-    /* 记录/留言区在顶部，按内容高度，不拉伸 */
+    /* 右侧面板（记录/留言）放在顶部，固定高度 */
     .right-panel {
         order: -1;
         width: 100%;
         flex: 0 0 auto;
         border-bottom: 1px solid #e0e0e0;
-        overflow: visible;
+        background: #fafafa;
     }
 
-    /* 对话+输入区填满剩余空间 */
+    /* 左侧对话区域：填满手机全部剩余屏幕 */
     .left-panel {
         order: 1;
         border-right: none;
-        flex: 1 1 0;
+        flex: 1;
         min-height: 0;
         display: flex;
         flex-direction: column;
         overflow: hidden;
+        width: 100%;
     }
 
+    /* 对话内容区：自动拉伸 */
     .chat-container {
-        flex: 1 1 0;
+        flex: 1;
         min-height: 0;
-        max-height: none;
         overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
     }
 
+    /* 输入框区域：永远贴底 */
     .bottom-input-area {
         flex: 0 0 auto;
+        width: 100%;
+        background: #fff;
+        border-top: 1px solid #e0e0e0;
     }
     
     .panel-section {
         flex: none;
-        max-height: none;
     }
 
     .panel-section .section-body {
@@ -1538,30 +1564,17 @@ body {
         overflow-y: auto;
     }
 
+    .nutrition-section .section-body {
+        max-height: 240px;
+    }
+
     .panel-section.collapsed .section-body {
         max-height: 0 !important;
     }
     
-    .records-section {
-        min-height: auto;
-    }
-    
-    .messages-section {
-        min-height: auto;
-        padding-bottom: 0;
-    }
-    
     .records-list,
     .messages-list {
         max-height: none;
-        overflow-y: visible;
-    }
-}
-    
-    .records-list,
-    .messages-list {
-        max-height: none;
-        overflow-y: visible;
     }
 }
 
@@ -1586,16 +1599,7 @@ body {
     .user-name {
         display: none;
     }
-    
-    .chat-container {
-        max-height: 35vh;
-    }
-    
-    .records-list,
-    .messages-list {
-        max-height: 150px;
-    }
-    
+
     .section-header {
         padding: 10px 12px;
     }

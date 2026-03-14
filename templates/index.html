@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>食友记 - 记录美食，分享健康</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 </head>
 <body>
     <div class="main-container">
@@ -97,6 +98,24 @@
 
             <!-- 右侧：记录和留言 -->
             <div class="right-panel">
+                <!-- 今日营养 -->
+                <div class="panel-section nutrition-section">
+                    <div class="section-header" onclick="toggleSection(this)">
+                        <h3>今日营养</h3>
+                        <svg class="section-toggle" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </div>
+                    <div class="section-body">
+                        <div class="nutrition-chart-container" id="nutritionChartContainer">
+                            <canvas id="nutritionChart"></canvas>
+                            <div class="nutrition-empty" id="nutritionEmpty" style="display:none">
+                                暂无今日营养数据，记录饮食后自动生成
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- 一周饮食记录 -->
                 <div class="panel-section records-section">
                     <div class="section-header" onclick="toggleSection(this)">
